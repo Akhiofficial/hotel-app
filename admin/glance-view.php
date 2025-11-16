@@ -7,18 +7,33 @@ if(empty($_SESSION['admin'])){ header('Location: login.php'); exit; }
 $today = date('Y-m-d');
 
 // Get all active rooms with occupancy status
-// IMPORTANT: Only count bookings with status = 'confirmed' or 'paid' as occupied
-// Use DATE() function to ensure proper date comparison
+// IMPORTANT: Count ALL confirmed/paid bookings (past, present, and future) to calculate availability
+// This ensures that reserved rooms are not shown as available
 $rooms = $DB->query("SELECT r.*, 
                      (SELECT COUNT(*) FROM bookings b 
                       WHERE b.room_id = r.id 
                       AND b.status IN ('confirmed', 'paid')
                       AND b.checkin IS NOT NULL 
-                      AND b.checkout IS NOT NULL
                       AND b.checkin <> '0000-00-00'
-                      AND b.checkout <> '0000-00-00'
-                      AND DATE(b.checkin) <= DATE('$today')
-                      AND DATE(b.checkout) > DATE('$today')) as occupied_count
+                      -- Count all confirmed/paid bookings regardless of date
+                      -- This includes past, current, and future bookings
+                      ) as total_confirmed_bookings,
+                     (SELECT COUNT(*) FROM bookings b 
+                      WHERE b.room_id = r.id 
+                      AND b.status IN ('confirmed', 'paid')
+                      AND b.checkin IS NOT NULL 
+                      AND b.checkin <> '0000-00-00'
+                      AND (
+                          -- Currently active bookings (checkin <= today < checkout)
+                          (b.checkout IS NOT NULL 
+                           AND b.checkout <> '0000-00-00'
+                           AND DATE(b.checkin) <= DATE('$today')
+                           AND DATE(b.checkout) > DATE('$today'))
+                          OR
+                          -- Invalid checkout but checkin is today or past
+                          ((b.checkout IS NULL OR b.checkout = '0000-00-00')
+                           AND DATE(b.checkin) <= DATE('$today'))
+                      )) as currently_occupied_count
                      FROM rooms r 
                      WHERE r.status='active' 
                      ORDER BY r.code")->fetch_all(MYSQLI_ASSOC);
@@ -26,26 +41,66 @@ $rooms = $DB->query("SELECT r.*,
 // Enhance rooms with booking details
 foreach($rooms as &$room) {
     $total_quantity = intval($room['quantity'] ?? 1);
-    $occupied_count = intval($room['occupied_count']);
-    $room['available_count'] = max(0, $total_quantity - $occupied_count);
-    $room['is_occupied'] = ($occupied_count > 0);
+    // Use total_confirmed_bookings for availability calculation (includes future bookings)
+    $total_confirmed = intval($room['total_confirmed_bookings'] ?? 0);
+    // Use currently_occupied_count to determine if room is currently occupied (for display)
+    $currently_occupied = intval($room['currently_occupied_count'] ?? 0);
+    
+    // Available count = total quantity - all confirmed/paid bookings (including future)
+    $room['available_count'] = max(0, $total_quantity - $total_confirmed);
+    // Room is "occupied" if currently active booking exists OR if available_count is 0 (fully booked)
+    $room['is_occupied'] = ($currently_occupied > 0 || $room['available_count'] <= 0);
     $room['is_fully_occupied'] = ($room['available_count'] <= 0 && $total_quantity > 0);
     
-    // Get current booking details if occupied (only confirmed/paid bookings)
-    if($room['is_occupied']) {
+    // Get current booking details if currently occupied
+    if($currently_occupied > 0) {
         $room['current_booking'] = $DB->query("SELECT b.*, r.title as room_title 
                                                FROM bookings b 
                                                LEFT JOIN rooms r ON r.id = b.room_id 
                                                WHERE b.room_id = {$room['id']} 
                                                AND b.status IN ('confirmed', 'paid')
                                                AND b.checkin IS NOT NULL 
-                                               AND b.checkout IS NOT NULL
                                                AND b.checkin <> '0000-00-00'
-                                               AND b.checkout <> '0000-00-00'
-                                               AND DATE(b.checkin) <= DATE('$today')
-                                               AND DATE(b.checkout) > DATE('$today')
+                                               AND (
+                                                   -- Currently active
+                                                   (b.checkout IS NOT NULL 
+                                                    AND b.checkout <> '0000-00-00'
+                                                    AND DATE(b.checkin) <= DATE('$today')
+                                                    AND DATE(b.checkout) > DATE('$today'))
+                                                   OR
+                                                   -- Invalid checkout but checkin is today or past
+                                                   ((b.checkout IS NULL OR b.checkout = '0000-00-00')
+                                                    AND DATE(b.checkin) <= DATE('$today'))
+                                               )
                                                ORDER BY b.checkin DESC 
                                                LIMIT 1")->fetch_assoc();
+    }
+    
+    // If fully booked but no current booking, get the next upcoming booking
+    if($room['is_fully_occupied'] && empty($room['current_booking'])) {
+        $room['next_booking'] = $DB->query("SELECT b.*, r.title as room_title 
+                                            FROM bookings b 
+                                            LEFT JOIN rooms r ON r.id = b.room_id 
+                                            WHERE b.room_id = {$room['id']} 
+                                            AND b.status IN ('confirmed', 'paid')
+                                            AND b.checkin IS NOT NULL 
+                                            AND b.checkin <> '0000-00-00'
+                                            ORDER BY b.checkin ASC 
+                                            LIMIT 1")->fetch_assoc();
+    }
+    
+    // Get next upcoming booking if not currently occupied and not fully booked
+    if(!$room['is_occupied'] && $room['available_count'] > 0) {
+        $room['next_booking'] = $DB->query("SELECT b.*, r.title as room_title 
+                                            FROM bookings b 
+                                            LEFT JOIN rooms r ON r.id = b.room_id 
+                                            WHERE b.room_id = {$room['id']} 
+                                            AND b.status IN ('confirmed', 'paid')
+                                            AND b.checkin IS NOT NULL 
+                                            AND b.checkin <> '0000-00-00'
+                                            AND DATE(b.checkin) > DATE('$today')
+                                            ORDER BY b.checkin ASC 
+                                            LIMIT 1")->fetch_assoc();
     }
     
     // Debug: Get all bookings for this room to help troubleshoot
@@ -53,11 +108,16 @@ foreach($rooms as &$room) {
                                           DATE(checkin) as checkin_date, 
                                           DATE(checkout) as checkout_date,
                                           CASE 
-                                            WHEN DATE(checkin) <= DATE('$today') AND DATE(checkout) > DATE('$today') THEN 'ACTIVE'
+                                            WHEN (checkout IS NULL OR checkout = '0000-00-00') AND DATE(checkin) <= DATE('$today') THEN 'ACTIVE (no checkout)'
+                                            WHEN checkout IS NOT NULL AND checkout <> '0000-00-00' AND DATE(checkin) <= DATE('$today') AND DATE(checkout) > DATE('$today') THEN 'ACTIVE'
                                             WHEN DATE(checkin) > DATE('$today') THEN 'FUTURE'
-                                            WHEN DATE(checkout) <= DATE('$today') THEN 'PAST'
+                                            WHEN checkout IS NOT NULL AND checkout <> '0000-00-00' AND DATE(checkout) <= DATE('$today') THEN 'PAST'
                                             ELSE 'UNKNOWN'
-                                          END as date_status
+                                          END as date_status,
+                                          CASE
+                                            WHEN status IN ('confirmed', 'paid') THEN 'YES'
+                                            ELSE 'NO'
+                                          END as will_be_counted
                                           FROM bookings 
                                           WHERE room_id = {$room['id']} 
                                           AND status IN ('confirmed', 'paid', 'pending')
@@ -103,6 +163,22 @@ $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
         .debug-booking.active { border-left-color: #28a745; }
         .debug-booking.future { border-left-color: #ffc107; }
         .debug-booking.past { border-left-color: #6c757d; }
+        .will-be-counted {
+            font-weight: bold;
+            color: #28a745;
+        }
+        .will-not-be-counted {
+            font-weight: bold;
+            color: #dc3545;
+        }
+        .upcoming-booking {
+            background: #fff3cd;
+            border-left: 3px solid #ffc107;
+            padding: 8px;
+            margin-top: 8px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
@@ -129,24 +205,28 @@ $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
             <?php if($debug_mode): ?>
             <div class="debug-panel">
                 <h4>Debug Information - Today: <?=$today?></h4>
-                <p><strong>Note:</strong> Only bookings with status 'confirmed' or 'paid' are counted as occupied.</p>
+                <p><strong>Note:</strong> All confirmed/paid bookings (past, present, and future) are counted in availability calculation.</p>
+                <p><strong>Available Count = Total Quantity - All Confirmed/Paid Bookings</strong></p>
                 <?php foreach($rooms as $room): ?>
                     <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 4px;">
                         <strong><?=esc($room['code'])?> - <?=esc($room['title'])?></strong><br>
-                        <small>Occupied Count: <?=$room['occupied_count']?> | Available: <?=$room['available_count']?>/<?=$room['quantity'] ?? 1?></small>
+                        <small>
+                            Total Quantity: <?=$room['quantity'] ?? 1?> | 
+                            Total Confirmed Bookings: <strong style="color: #28a745;"><?=$room['total_confirmed_bookings'] ?? 0?></strong> | 
+                            Currently Occupied: <strong style="color: <?=$room['currently_occupied_count'] > 0 ? '#dc3545' : '#28a745'?>"><?=$room['currently_occupied_count'] ?? 0?></strong> | 
+                            Available: <strong style="color: <?=$room['available_count'] > 0 ? '#28a745' : '#dc3545'?>"><?=$room['available_count']?></strong>
+                        </small>
                         <?php if(!empty($room['debug_bookings'])): ?>
                             <div style="margin-top: 8px;">
                                 <strong>All Bookings:</strong>
                                 <?php foreach($room['debug_bookings'] as $dbg): ?>
-                                    <div class="debug-booking <?=strtolower($dbg['date_status'])?>">
+                                    <div class="debug-booking <?=strtolower(str_replace([' ', '(', ')'], ['-', '', ''], $dbg['date_status']))?>">
                                         ID: <?=$dbg['id']?> | Status: <strong><?=$dbg['status']?></strong> | 
-                                        Check-in: <?=$dbg['checkin']?> | Check-out: <?=$dbg['checkout']?> | 
-                                        <strong><?=$dbg['date_status']?></strong>
-                                        <?php if($dbg['status'] == 'confirmed' || $dbg['status'] == 'paid'): ?>
-                                            <span style="color: green;">✓ Counted</span>
-                                        <?php else: ?>
-                                            <span style="color: red;">✗ Not counted (status: <?=$dbg['status']?>)</span>
-                                        <?php endif; ?>
+                                        Check-in: <?=$dbg['checkin']?> | Check-out: <?=$dbg['checkout'] == '0000-00-00' ? '<span style="color: red;">INVALID</span>' : $dbg['checkout']?> | 
+                                        <strong><?=$dbg['date_status']?></strong> | 
+                                        <span class="<?=$dbg['will_be_counted'] == 'YES' ? 'will-be-counted' : 'will-not-be-counted'?>">
+                                            <?=$dbg['will_be_counted'] == 'YES' ? '✓ COUNTED IN AVAILABILITY' : '✗ NOT COUNTED'?>
+                                        </span>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -235,10 +315,17 @@ $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
                                     <i class="fas fa-calendar-check"></i>
                                     <span><strong>Check-in:</strong> <?=date('M d, Y', strtotime($booking['checkin']))?></span>
                                 </div>
+                                <?php if($booking['checkout'] && $booking['checkout'] !== '0000-00-00'): ?>
                                 <div class="glance-detail-row">
                                     <i class="fas fa-calendar-times"></i>
                                     <span><strong>Check-out:</strong> <?=date('M d, Y', strtotime($booking['checkout']))?></span>
                                 </div>
+                                <?php else: ?>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-calendar-times"></i>
+                                    <span><strong>Check-out:</strong> <span style="color: #ffc107;">Not set</span></span>
+                                </div>
+                                <?php endif; ?>
                                 <div class="glance-detail-row">
                                     <i class="fas fa-phone"></i>
                                     <span><?=esc($booking['customer_phone'])?></span>
@@ -250,6 +337,59 @@ $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
                                 <div class="glance-detail-row">
                                     <i class="fas fa-info-circle"></i>
                                     <span><strong>Status:</strong> <span style="text-transform: capitalize; color: <?=$booking['status'] === 'confirmed' ? '#28a745' : '#007bff'?>;"><?=esc($booking['status'])?></span></span>
+                                </div>
+                            </div>
+                        <?php elseif($room['is_fully_occupied'] && !empty($room['next_booking'])): 
+                            // Fully booked but no current active booking - show next booking
+                            $booking = $room['next_booking'];
+                        ?>
+                            <div class="glance-booking-details">
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-exclamation-triangle" style="color: #ffc107;"></i>
+                                    <span><strong style="color: #dc3545;">Fully Booked</strong></span>
+                                </div>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-bed"></i>
+                                    <span><strong>Available:</strong> <span style="color: #dc3545;">0/<?=$room['quantity'] ?? 1?> rooms</span></span>
+                                </div>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-user"></i>
+                                    <span><strong>Next Guest:</strong> <?=esc($booking['customer_name'])?></span>
+                                </div>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-calendar-check"></i>
+                                    <span><strong>Check-in:</strong> <?=date('M d, Y', strtotime($booking['checkin']))?></span>
+                                </div>
+                                <?php if($booking['checkout'] && $booking['checkout'] !== '0000-00-00'): ?>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-calendar-times"></i>
+                                    <span><strong>Check-out:</strong> <?=date('M d, Y', strtotime($booking['checkout']))?></span>
+                                </div>
+                                <?php endif; ?>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-info-circle"></i>
+                                    <span><strong>Status:</strong> <span style="text-transform: capitalize; color: <?=$booking['status'] === 'confirmed' ? '#28a745' : '#007bff'?>;"><?=esc($booking['status'])?></span></span>
+                                </div>
+                            </div>
+                        <?php elseif($room['is_fully_occupied']): 
+                            // Fully booked but no booking details available
+                        ?>
+                            <div class="glance-available-details">
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-exclamation-triangle" style="color: #dc3545;"></i>
+                                    <span><strong style="color: #dc3545;">Fully Booked</strong></span>
+                                </div>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-bed"></i>
+                                    <span><strong>Available:</strong> <span style="color: #dc3545;">0/<?=$room['quantity'] ?? 1?> rooms</span></span>
+                                </div>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-users"></i>
+                                    <span><strong>Capacity:</strong> <?=$room['capacity']?> guest(s)</span>
+                                </div>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-rupee-sign"></i>
+                                    <span><strong>Price:</strong> ₹<?=number_format($room['price'], 2)?>/night</span>
                                 </div>
                             </div>
                         <?php else: ?>
@@ -266,6 +406,14 @@ $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
                                     <i class="fas fa-rupee-sign"></i>
                                     <span><strong>Price:</strong> ₹<?=number_format($room['price'], 2)?>/night</span>
                                 </div>
+                                <?php if(!empty($room['next_booking'])): 
+                                    $nextBooking = $room['next_booking'];
+                                ?>
+                                    <div class="upcoming-booking">
+                                        <i class="fas fa-calendar-alt" style="color: #ffc107;"></i>
+                                        <strong>Upcoming:</strong> <?=esc($nextBooking['customer_name'])?> on <?=date('M d, Y', strtotime($nextBooking['checkin']))?>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -274,6 +422,10 @@ $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
                         <?php if($room['is_occupied'] && !empty($room['current_booking'])): ?>
                             <a href="bookings.php#booking-<?=esc($room['current_booking']['id'])?>" class="btn-view-booking">
                                 <i class="fas fa-eye"></i> View Booking
+                            </a>
+                        <?php elseif($room['is_fully_occupied'] && !empty($room['next_booking'])): ?>
+                            <a href="bookings.php#booking-<?=esc($room['next_booking']['id'])?>" class="btn-view-booking">
+                                <i class="fas fa-eye"></i> View Next Booking
                             </a>
                         <?php else: ?>
                             <a href="create-booking.php?room_id=<?=esc($room['id'])?>" class="btn-book-room">
