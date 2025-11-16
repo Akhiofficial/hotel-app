@@ -97,9 +97,14 @@ $today = date('Y-m-d');
 // Enhance rooms with occupancy status
 foreach($rooms as &$room) {
     // Check if any rooms of this type are occupied today
+    // Count bookings that are active today (checkin <= today < checkout)
     $occupied_count = $DB->query("SELECT COUNT(*) as count FROM bookings b 
                                   WHERE b.room_id = {$room['id']} 
                                   AND b.status <> 'cancelled' 
+                                  AND b.checkin IS NOT NULL 
+                                  AND b.checkout IS NOT NULL
+                                  AND b.checkin <> '0000-00-00'
+                                  AND b.checkout <> '0000-00-00'
                                   AND '$today' >= b.checkin 
                                   AND '$today' < b.checkout")->fetch_assoc()['count'];
     

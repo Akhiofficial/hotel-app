@@ -1190,3 +1190,182 @@ body {
     font-size: 16px;
     margin-top: 10px;
 }
+
+/* Glance View Styles */
+.glance-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.glance-tab {
+    padding: 12px 24px;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+    color: #666;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.glance-tab:hover {
+    color: var(--primary);
+    background: rgba(26, 77, 46, 0.05);
+}
+
+.glance-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    background: rgba(26, 77, 46, 0.1);
+}
+
+.glance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.glance-room-card {
+    background: var(--white);
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.glance-room-card.occupied {
+    border-color: #fcc;
+    background: #fff5f5;
+}
+
+.glance-room-card.available {
+    border-color: #cfc;
+    background: #f5fff5;
+}
+
+.glance-room-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.glance-card-header {
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.glance-room-info h3 {
+    margin: 0 0 5px 0;
+    color: var(--text-dark);
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.glance-room-info p {
+    margin: 0;
+    color: #666;
+    font-size: 14px;
+}
+
+.glance-status-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.badge-red {
+    background: #fee;
+    color: #c33;
+    border: 1px solid #fcc;
+}
+
+.badge-green {
+    background: #efe;
+    color: #3c3;
+    border: 1px solid #cfc;
+}
+
+.glance-card-body {
+    padding: 20px;
+}
+
+.glance-booking-details,
+.glance-available-details {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.glance-detail-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: #555;
+}
+
+.glance-detail-row i {
+    width: 20px;
+    color: var(--primary);
+    text-align: center;
+}
+
+.glance-detail-row strong {
+    color: var(--text-dark);
+    margin-right: 5px;
+}
+
+.glance-card-footer {
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #e0e0e0;
+}
+
+.btn-view-booking,
+.btn-book-room {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s;
+    width: 100%;
+    justify-content: center;
+}
+
+.btn-view-booking {
+    background: var(--primary);
+    color: var(--white);
+}
+
+.btn-view-booking:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+}
+
+.btn-book-room {
+    background: #50B848;
+    color: var(--white);
+}
+
+.btn-book-room:hover {
+    background: #45a03d;
+    transform: translateY(-2px);
+}

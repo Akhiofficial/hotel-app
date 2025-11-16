@@ -28,9 +28,9 @@
         <i class="fas fa-concierge-bell"></i>
         <span>Services</span>
     </a>
-    <a href="settings.php" class="nav-item <?=basename($_SERVER['PHP_SELF']) == 'settings.php' ? 'active' : ''?>">
-        <i class="fas fa-cog"></i>
-        <span>Settings</span>
+    <a href="glance-view.php" class="nav-item <?=basename($_SERVER['PHP_SELF']) == 'glance-view.php' ? 'active' : ''?>">
+        <i class="fas fa-eye"></i>
+        <span>View Glance</span>
     </a>
     <a href="../public/index.php" target="_blank" class="nav-item">
         <i class="fas fa-external-link-alt"></i>

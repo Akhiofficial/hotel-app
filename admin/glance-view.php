@@ -1,0 +1,354 @@
+<?php
+session_start();
+require_once __DIR__ . '/../db.php';
+if(empty($_SESSION['admin'])){ header('Location: login.php'); exit; }
+
+// Get today's date
+$today = date('Y-m-d');
+
+// Get all active rooms with occupancy status
+// IMPORTANT: Only count bookings with status = 'confirmed' or 'paid' as occupied
+// Use DATE() function to ensure proper date comparison
+$rooms = $DB->query("SELECT r.*, 
+                     (SELECT COUNT(*) FROM bookings b 
+                      WHERE b.room_id = r.id 
+                      AND b.status IN ('confirmed', 'paid')
+                      AND b.checkin IS NOT NULL 
+                      AND b.checkout IS NOT NULL
+                      AND b.checkin <> '0000-00-00'
+                      AND b.checkout <> '0000-00-00'
+                      AND DATE(b.checkin) <= DATE('$today')
+                      AND DATE(b.checkout) > DATE('$today')) as occupied_count
+                     FROM rooms r 
+                     WHERE r.status='active' 
+                     ORDER BY r.code")->fetch_all(MYSQLI_ASSOC);
+
+// Enhance rooms with booking details
+foreach($rooms as &$room) {
+    $total_quantity = intval($room['quantity'] ?? 1);
+    $occupied_count = intval($room['occupied_count']);
+    $room['available_count'] = max(0, $total_quantity - $occupied_count);
+    $room['is_occupied'] = ($occupied_count > 0);
+    $room['is_fully_occupied'] = ($room['available_count'] <= 0 && $total_quantity > 0);
+    
+    // Get current booking details if occupied (only confirmed/paid bookings)
+    if($room['is_occupied']) {
+        $room['current_booking'] = $DB->query("SELECT b.*, r.title as room_title 
+                                               FROM bookings b 
+                                               LEFT JOIN rooms r ON r.id = b.room_id 
+                                               WHERE b.room_id = {$room['id']} 
+                                               AND b.status IN ('confirmed', 'paid')
+                                               AND b.checkin IS NOT NULL 
+                                               AND b.checkout IS NOT NULL
+                                               AND b.checkin <> '0000-00-00'
+                                               AND b.checkout <> '0000-00-00'
+                                               AND DATE(b.checkin) <= DATE('$today')
+                                               AND DATE(b.checkout) > DATE('$today')
+                                               ORDER BY b.checkin DESC 
+                                               LIMIT 1")->fetch_assoc();
+    }
+    
+    // Debug: Get all bookings for this room to help troubleshoot
+    $room['debug_bookings'] = $DB->query("SELECT id, status, checkin, checkout, 
+                                          DATE(checkin) as checkin_date, 
+                                          DATE(checkout) as checkout_date,
+                                          CASE 
+                                            WHEN DATE(checkin) <= DATE('$today') AND DATE(checkout) > DATE('$today') THEN 'ACTIVE'
+                                            WHEN DATE(checkin) > DATE('$today') THEN 'FUTURE'
+                                            WHEN DATE(checkout) <= DATE('$today') THEN 'PAST'
+                                            ELSE 'UNKNOWN'
+                                          END as date_status
+                                          FROM bookings 
+                                          WHERE room_id = {$room['id']} 
+                                          AND status IN ('confirmed', 'paid', 'pending')
+                                          ORDER BY checkin DESC")->fetch_all(MYSQLI_ASSOC);
+}
+unset($room);
+
+// Separate occupied and available rooms
+$occupiedRooms = array_filter($rooms, function($r) { return $r['is_occupied']; });
+$availableRooms = array_filter($rooms, function($r) { return !$r['is_occupied']; });
+
+// Debug mode - set to true to see booking details
+$debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Occupancy Glance View - Admin Panel</title>
+    <link rel="stylesheet" href="admin-styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .debug-panel {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+        .debug-panel h4 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .debug-booking {
+            background: white;
+            padding: 8px;
+            margin: 5px 0;
+            border-left: 3px solid #007bff;
+            border-radius: 4px;
+        }
+        .debug-booking.active { border-left-color: #28a745; }
+        .debug-booking.future { border-left-color: #ffc107; }
+        .debug-booking.past { border-left-color: #6c757d; }
+    </style>
+</head>
+<body>
+    <?php include 'admin-header.php'; ?>
+    
+    <div class="admin-container">
+        <div class="admin-sidebar">
+            <?php include 'admin-sidebar.php'; ?>
+        </div>
+        
+        <div class="admin-content">
+            <div class="page-header">
+                <h1><i class="fas fa-eye"></i> Room Occupancy Glance View</h1>
+                <p>Quick overview of all room statuses - <?=date('F d, Y')?> 
+                    <span id="lastUpdate" style="color: #666; font-size: 14px; margin-left: 10px;">
+                        <i class="fas fa-sync-alt"></i> Auto-refreshing every 30 seconds
+                    </span>
+                    <a href="?debug=<?=$debug_mode ? '0' : '1'?>" style="margin-left: 15px; font-size: 12px; color: #007bff;">
+                        <?=$debug_mode ? 'Hide Debug' : 'Show Debug'?>
+                    </a>
+                </p>
+            </div>
+
+            <?php if($debug_mode): ?>
+            <div class="debug-panel">
+                <h4>Debug Information - Today: <?=$today?></h4>
+                <p><strong>Note:</strong> Only bookings with status 'confirmed' or 'paid' are counted as occupied.</p>
+                <?php foreach($rooms as $room): ?>
+                    <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 4px;">
+                        <strong><?=esc($room['code'])?> - <?=esc($room['title'])?></strong><br>
+                        <small>Occupied Count: <?=$room['occupied_count']?> | Available: <?=$room['available_count']?>/<?=$room['quantity'] ?? 1?></small>
+                        <?php if(!empty($room['debug_bookings'])): ?>
+                            <div style="margin-top: 8px;">
+                                <strong>All Bookings:</strong>
+                                <?php foreach($room['debug_bookings'] as $dbg): ?>
+                                    <div class="debug-booking <?=strtolower($dbg['date_status'])?>">
+                                        ID: <?=$dbg['id']?> | Status: <strong><?=$dbg['status']?></strong> | 
+                                        Check-in: <?=$dbg['checkin']?> | Check-out: <?=$dbg['checkout']?> | 
+                                        <strong><?=$dbg['date_status']?></strong>
+                                        <?php if($dbg['status'] == 'confirmed' || $dbg['status'] == 'paid'): ?>
+                                            <span style="color: green;">✓ Counted</span>
+                                        <?php else: ?>
+                                            <span style="color: red;">✗ Not counted (status: <?=$dbg['status']?>)</span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php else: ?>
+                            <div style="color: #6c757d; margin-top: 5px;">No bookings found</div>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+
+            <!-- Summary Cards -->
+            <div class="stats-grid" style="margin-bottom: 30px;">
+                <div class="stat-card">
+                    <div class="stat-icon green">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="availableCount"><?=count($availableRooms)?></h3>
+                        <p>Available Rooms</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon red">
+                        <i class="fas fa-bed"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="occupiedCount"><?=count($occupiedRooms)?></h3>
+                        <p>Occupied Rooms</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon blue">
+                        <i class="fas fa-building"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="totalCount"><?=count($rooms)?></h3>
+                        <p>Total Rooms</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Tabs -->
+            <div class="glance-tabs">
+                <button class="glance-tab active" data-filter="all" onclick="filterRooms('all')">
+                    <i class="fas fa-th"></i> All Rooms (<span id="allCount"><?=count($rooms)?></span>)
+                </button>
+                <button class="glance-tab" data-filter="occupied" onclick="filterRooms('occupied')">
+                    <i class="fas fa-bed"></i> Occupied (<span id="occupiedTabCount"><?=count($occupiedRooms)?></span>)
+                </button>
+                <button class="glance-tab" data-filter="available" onclick="filterRooms('available')">
+                    <i class="fas fa-check-circle"></i> Available (<span id="availableTabCount"><?=count($availableRooms)?></span>)
+                </button>
+                <button class="glance-tab" onclick="refreshGlanceView()" style="margin-left: auto;">
+                    <i class="fas fa-sync-alt"></i> Refresh Now
+                </button>
+            </div>
+
+            <!-- Room Cards Grid -->
+            <div class="glance-grid" id="glanceGrid">
+                <?php foreach($rooms as $room): ?>
+                <div class="glance-room-card <?=$room['is_occupied'] ? 'occupied' : 'available'?>" 
+                     data-status="<?=$room['is_occupied'] ? 'occupied' : 'available'?>"
+                     data-room-id="<?=esc($room['id'])?>">
+                    <div class="glance-card-header">
+                        <div class="glance-room-info">
+                            <h3><?=esc($room['code'])?></h3>
+                            <p><?=esc($room['title'])?></p>
+                        </div>
+                        <div class="glance-status-badge <?=$room['is_occupied'] ? 'badge-red' : 'badge-green'?>">
+                            <i class="fas fa-<?=$room['is_occupied'] ? 'times-circle' : 'check-circle'?>"></i>
+                            <?=$room['is_occupied'] ? 'Occupied' : 'Available'?>
+                        </div>
+                    </div>
+                    
+                    <div class="glance-card-body">
+                        <?php if($room['is_occupied'] && !empty($room['current_booking'])): 
+                            $booking = $room['current_booking'];
+                        ?>
+                            <div class="glance-booking-details">
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-user"></i>
+                                    <span><strong>Guest:</strong> <?=esc($booking['customer_name'])?></span>
+                                </div>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-calendar-check"></i>
+                                    <span><strong>Check-in:</strong> <?=date('M d, Y', strtotime($booking['checkin']))?></span>
+                                </div>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-calendar-times"></i>
+                                    <span><strong>Check-out:</strong> <?=date('M d, Y', strtotime($booking['checkout']))?></span>
+                                </div>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-phone"></i>
+                                    <span><?=esc($booking['customer_phone'])?></span>
+                                </div>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-rupee-sign"></i>
+                                    <span>₹<?=number_format($booking['total'], 2)?></span>
+                                </div>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-info-circle"></i>
+                                    <span><strong>Status:</strong> <span style="text-transform: capitalize; color: <?=$booking['status'] === 'confirmed' ? '#28a745' : '#007bff'?>;"><?=esc($booking['status'])?></span></span>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <div class="glance-available-details">
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-bed"></i>
+                                    <span><strong>Available:</strong> <span id="available-<?=esc($room['id'])?>"><?=$room['available_count']?></span>/<?=$room['quantity'] ?? 1?> rooms</span>
+                                </div>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-users"></i>
+                                    <span><strong>Capacity:</strong> <?=$room['capacity']?> guest(s)</span>
+                                </div>
+                                <div class="glance-detail-row">
+                                    <i class="fas fa-rupee-sign"></i>
+                                    <span><strong>Price:</strong> ₹<?=number_format($room['price'], 2)?>/night</span>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <div class="glance-card-footer">
+                        <?php if($room['is_occupied'] && !empty($room['current_booking'])): ?>
+                            <a href="bookings.php#booking-<?=esc($room['current_booking']['id'])?>" class="btn-view-booking">
+                                <i class="fas fa-eye"></i> View Booking
+                            </a>
+                        <?php else: ?>
+                            <a href="create-booking.php?room_id=<?=esc($room['id'])?>" class="btn-book-room">
+                                <i class="fas fa-plus"></i> Book Now
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin-scripts.js"></script>
+    <script>
+    function filterRooms(filter) {
+        // Update active tab
+        document.querySelectorAll('.glance-tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        const activeTab = document.querySelector(`.glance-tab[data-filter="${filter}"]`);
+        if(activeTab) activeTab.classList.add('active');
+        
+        // Filter cards
+        const cards = document.querySelectorAll('.glance-room-card');
+        cards.forEach(card => {
+            if(filter === 'all') {
+                card.style.display = 'block';
+            } else {
+                const status = card.getAttribute('data-status');
+                card.style.display = (status === filter) ? 'block' : 'none';
+            }
+        });
+    }
+    
+    // Auto-refresh function
+    function refreshGlanceView() {
+        const refreshBtn = document.querySelector('.glance-tab:last-child');
+        if(refreshBtn) {
+            const icon = refreshBtn.querySelector('i');
+            if(icon) {
+                icon.classList.add('fa-spin');
+            }
+        }
+        
+        // Reload the page to get fresh data
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
+    }
+    
+    // Auto-refresh every 30 seconds
+    let autoRefreshInterval = setInterval(refreshGlanceView, 30000);
+    
+    // Update last update time
+    function updateLastUpdateTime() {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString();
+        const lastUpdateEl = document.getElementById('lastUpdate');
+        if(lastUpdateEl) {
+            lastUpdateEl.innerHTML = `<i class="fas fa-sync-alt"></i> Last updated: ${timeStr}`;
+        }
+    }
+    
+    // Update time every minute
+    setInterval(updateLastUpdateTime, 60000);
+    
+    // Clear interval when page is hidden (to save resources)
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            clearInterval(autoRefreshInterval);
+        } else {
+            autoRefreshInterval = setInterval(refreshGlanceView, 30000);
+        }
+    });
+    </script>
+</body>
+</html>

@@ -145,6 +145,9 @@ function formatDate($date) {
                                         <a href="invoice.php?id=<?=esc($b['id'])?>" target="_blank" class="btn-icon btn-info" title="Invoice">
                                             <i class="fas fa-file-invoice"></i>
                                         </a>
+                                        <button class="btn-icon btn-danger" onclick="deleteBooking(<?=esc($b['id'])?>)" title="Delete Booking">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -176,7 +179,75 @@ function formatDate($date) {
             } else {
                 alert('Error: ' + (data.msg || 'Failed to update'));
             }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
         });
+    }
+    
+    function deleteBooking(id) {
+        if(!confirm('Are you sure you want to delete booking #' + id + '?\n\nThis action cannot be undone!')) {
+            return;
+        }
+        
+        // Show loading state
+        const row = document.getElementById('booking-' + id);
+        if(row) {
+            row.style.opacity = '0.5';
+        }
+        
+        fetch('api.php?action=delete_booking', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'id=' + id
+        })
+        .then(r => r.json())
+        .then(data => {
+            if(data.success) {
+                // Remove row with animation
+                if(row) {
+                    row.style.transition = 'opacity 0.3s, transform 0.3s';
+                    row.style.opacity = '0';
+                    row.style.transform = 'translateX(-20px)';
+                    setTimeout(function() {
+                        row.remove();
+                        // Show success message
+                        showNotification('Booking deleted successfully', 'success');
+                    }, 300);
+                } else {
+                    location.reload();
+                }
+            } else {
+                alert('Error: ' + (data.msg || 'Failed to delete booking'));
+                if(row) {
+                    row.style.opacity = '1';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while deleting the booking. Please try again.');
+            if(row) {
+                row.style.opacity = '1';
+            }
+        });
+    }
+    
+    // Simple notification function
+    function showNotification(message, type) {
+        const notification = document.createElement('div');
+        notification.style.cssText = 'position:fixed;top:20px;right:20px;padding:15px 20px;background:' + 
+            (type === 'success' ? '#50B848' : '#E74C3C') + ';color:white;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.2);';
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        setTimeout(function() {
+            notification.style.opacity = '0';
+            notification.style.transition = 'opacity 0.3s';
+            setTimeout(function() {
+                notification.remove();
+            }, 300);
+        }, 3000);
     }
     </script>
 </body>

@@ -235,17 +235,44 @@ if($action === 'list_events'){
     }
     
     $events = [];
-    $res = $DB->query("SELECT b.id,b.checkin,b.checkout,r.title,r.code FROM bookings b 
+    $today = date('Y-m-d');
+    
+    $res = $DB->query("SELECT b.id,b.checkin,b.checkout,b.status,r.title,r.code,r.quantity,
+                       (SELECT COUNT(*) FROM bookings b2 
+                        WHERE b2.room_id = b.room_id 
+                        AND b2.status <> 'cancelled' 
+                        AND b2.checkin <= '$today' 
+                        AND b2.checkout > '$today'
+                        AND b2.id = b.id) as is_currently_occupied
+                       FROM bookings b 
                        LEFT JOIN rooms r ON r.id=b.room_id 
-                       $whereClause");
+                       $whereClause
+                       ORDER BY b.checkin");
+    
     while($row = $res->fetch_assoc()){
+        // Determine if this booking is currently active (today is between checkin and checkout)
+        $checkinDate = new DateTime($row['checkin']);
+        $checkoutDate = new DateTime($row['checkout']);
+        $todayDate = new DateTime($today);
+        
+        $isActive = ($todayDate >= $checkinDate && $todayDate < $checkoutDate);
+        
+        // Red for occupied/active bookings, green for future bookings
+        $backgroundColor = $isActive ? '#E74C3C' : '#50B848';
+        $borderColor = $isActive ? '#C0392B' : '#1A4D2E';
+        
         $events[] = [
             'id' => $row['id'],
             'title' => ($row['code'] ?? '') . ' - ' . ($row['title'] ?: "Booking #".$row['id']),
             'start' => $row['checkin'],
             'end' => (new DateTime($row['checkout']))->modify('+1 day')->format('Y-m-d'),
-            'backgroundColor' => '#50B848',
-            'borderColor' => '#1A4D2E'
+            'backgroundColor' => $backgroundColor,
+            'borderColor' => $borderColor,
+            'textColor' => '#ffffff',
+            'extendedProps' => [
+                'status' => $row['status'],
+                'isOccupied' => $isActive
+            ]
         ];
     }
     echo json_encode($events); exit;
@@ -388,6 +415,28 @@ if($action === 'mark_paid'){
     echo json_encode(['success'=>true]); exit;
 }
 
+// Delete booking
+if($action === 'delete_booking'){
+    header('Content-Type: application/json');
+    if(empty($_SESSION['admin'])) { 
+        sendJsonResponse(['success'=>false, 'msg'=>'Not authorized']); 
+    }
+    
+    $id = intval($_POST['id'] ?? 0);
+    if($id <= 0){
+        sendJsonResponse(['success'=>false, 'msg'=>'Invalid booking ID']);
+    }
+    
+    // Delete the booking
+    $result = $DB->query("DELETE FROM bookings WHERE id=$id");
+    
+    if($result){
+        sendJsonResponse(['success'=>true, 'msg'=>'Booking deleted successfully']);
+    } else {
+        sendJsonResponse(['success'=>false, 'msg'=>'Failed to delete booking: ' . $DB->error]);
+    }
+}
+
 // Update booking status
 if($action === 'update_status'){
     header('Content-Type: application/json');
@@ -405,6 +454,8 @@ if($action === 'update_status'){
     }
     exit;
 }
+
+
 
 // Default response
 header('Content-Type: application/json');
