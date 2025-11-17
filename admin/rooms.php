@@ -113,7 +113,7 @@ $occupied_count = $DB->query("
 SELECT COUNT(*) AS count
 FROM bookings b
 WHERE b.room_id = {$room['id']}
-  AND b.status IN ('confirmed','paid')
+  AND b.status <> 'cancelled'
   AND b.checkin IS NOT NULL
   AND b.checkin <> '0000-00-00'
   AND '$today' >= b.checkin
@@ -159,6 +159,7 @@ unset($room); // Break reference
 
             <?php if(isset($_GET['success'])): ?>
                 <div class="alert alert-success">Room saved successfully!</div>
+                <script>if(window.CapacityUpdates){ window.CapacityUpdates.emit(); }</script>
             <?php endif; ?>
 
             <!-- Room Form -->

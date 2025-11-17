@@ -27,6 +27,20 @@ $rooms = $DB->query("SELECT r.*,
                      ORDER BY r.code")->fetch_all(MYSQLI_ASSOC);
 
 $recentBookings = $DB->query("SELECT b.*, r.title as room_title FROM bookings b LEFT JOIN rooms r ON r.id=b.room_id ORDER BY b.created_at DESC LIMIT 10")->fetch_all(MYSQLI_ASSOC);
+
+function safeDateDisplay($date){
+    if(empty($date) || $date === '0000-00-00'){ return 'N/A'; }
+    $ts = strtotime($date);
+    return $ts ? date('M d, Y', $ts) : 'N/A';
+}
+function displayCheckout($checkin, $checkout, $nights){
+    if(!empty($checkout) && $checkout !== '0000-00-00'){ return safeDateDisplay($checkout); }
+    if(!empty($checkin) && !empty($nights) && intval($nights) >= 1){
+        $base = strtotime($checkin);
+        if($base){ return date('M d, Y', strtotime('+'.intval($nights).' day', $base)); }
+    }
+    return 'Not checked out';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -272,8 +286,8 @@ $recentBookings = $DB->query("SELECT b.*, r.title as room_title FROM bookings b 
                                         <small><?=esc($b['customer_email'])?></small>
                                     </td>
                                     <td><?=esc($b['room_title'] ?? 'N/A')?></td>
-                                    <td><?=date('M d, Y', strtotime($b['checkin']))?></td>
-                                    <td><?=date('M d, Y', strtotime($b['checkout']))?></td>
+                                    <td><?=safeDateDisplay($b['checkin'])?></td>
+                                    <td><?=displayCheckout($b['checkin'], $b['checkout'], $b['nights'])?></td>
                                     <td>₹<?=number_format($b['total'], 2)?></td>
                                     <td>
                                         <span class="status-badge status-<?=esc($b['status'])?>">

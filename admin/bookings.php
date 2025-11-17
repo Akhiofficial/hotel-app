@@ -13,24 +13,36 @@ $bookings = $DB->query("SELECT b.*, r.title as room_title, r.code as room_code
                         ORDER BY b.created_at DESC")->fetch_all(MYSQLI_ASSOC);
 
 // Helper function to format dates safely
-function formatDate($date) {
-    // Handle NULL, empty string, or invalid dates
+function formatDate($date, $placeholder = 'N/A') {
     if (empty($date) || $date === null || $date === 'NULL' || trim($date) === '') {
-        return 'N/A';
+        error_log('formatDate: empty date');
+        return $placeholder;
     }
-    
-    // Handle MySQL zero dates
     if ($date === '0000-00-00' || $date === '0000-00-00 00:00:00' || $date === '1970-01-01') {
-        return 'N/A';
+        error_log('formatDate: invalid zero date ' . $date);
+        return $placeholder;
     }
-    
-    // Try to parse the date
     $timestamp = strtotime($date);
     if ($timestamp === false || $timestamp < 0) {
-        return 'N/A';
+        error_log('formatDate: strtotime failed for ' . $date);
+        return $placeholder;
     }
-    
     return date('M d, Y', $timestamp);
+}
+
+function displayCheckout($checkin, $checkout, $nights) {
+    $out = formatDate($checkout, '');
+    if($out !== '') return $out;
+    // derive from checkin + nights if possible
+    if(!empty($checkin) && !empty($nights) && intval($nights) >= 1) {
+        $d1ts = strtotime($checkin);
+        if($d1ts !== false) {
+            $derived = date('M d, Y', strtotime("+".intval($nights)." day", $d1ts));
+            error_log('Derived checkout from nights for booking display');
+            return $derived;
+        }
+    }
+    return 'Not checked out';
 }
 ?>
 <!DOCTYPE html>
@@ -104,8 +116,8 @@ function formatDate($date) {
                                     <?=esc($b['room_title'] ?? 'N/A')?><br>
                                     <small class="text-muted"><?=esc($b['room_code'] ?? 'N/A')?></small>
                                 </td>
-                                <td><?=!empty($b['checkin']) && $b['checkin'] !== '0000-00-00' ? date('M d, Y', strtotime($b['checkin'])) : 'N/A'?></td>
-                                <td><?=formatDate($b['checkout'])?></td>
+                                <td><?=formatDate($b['checkin'])?></td>
+                                <td><?=displayCheckout($b['checkin'], $b['checkout'], $b['nights'])?></td>
                                 <td><?=esc($b['nights'])?></td>
                                 <td>
                                     <strong>₹<?=number_format($b['total'], 2)?></strong><br>
@@ -157,10 +169,17 @@ function formatDate($date) {
                 </table>
             </div>
         </div>
-    </div>
+</div>
 
     <script src="admin-scripts.js"></script>
     <script>
+    // Emit capacity update if redirected after creation
+    (function(){
+        try{
+            var params = new URLSearchParams(window.location.search);
+            if(params.get('capacity_updated') === '1' && window.CapacityUpdates){ window.CapacityUpdates.emit(); }
+        }catch(e){}
+    })();
     function markPaid(id) {
         if(!confirm('Mark booking #' + id + ' as paid?')) return;
         updateStatus(id, 'paid');
@@ -175,6 +194,7 @@ function formatDate($date) {
         .then(r => r.json())
         .then(data => {
             if(data.success) {
+                if(window.CapacityUpdates){ window.CapacityUpdates.emit(); }
                 location.reload();
             } else {
                 alert('Error: ' + (data.msg || 'Failed to update'));
@@ -214,8 +234,10 @@ function formatDate($date) {
                         row.remove();
                         // Show success message
                         showNotification('Booking deleted successfully', 'success');
+                        if(window.CapacityUpdates){ window.CapacityUpdates.emit(); }
                     }, 300);
                 } else {
+                    if(window.CapacityUpdates){ window.CapacityUpdates.emit(); }
                     location.reload();
                 }
             } else {

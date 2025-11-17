@@ -529,10 +529,15 @@ body {
 .status-badge {
     padding: 6px 14px;
     border-radius: 20px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     text-transform: capitalize;
+    line-height: 1.2;
+    margin: 4px 0;
+    white-space: nowrap;
 }
 
 .status-pending {

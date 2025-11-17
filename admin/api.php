@@ -36,6 +36,7 @@ if($action === 'create_booking'){
         $phone = trim($_POST['customer_phone'] ?? '');
         $checkin = trim($_POST['checkin'] ?? '');
         $checkout = trim($_POST['checkout'] ?? '');
+        $payment = $_POST['payment_method'] ?? 'cash';
         
         // Debug: Log what we received
         error_log("Received checkin: " . $checkin);
@@ -135,6 +136,38 @@ if($action === 'create_booking'){
         $gst_amount = round($subtotal * $gst / 100, 2);
         $total = round($subtotal + $gst_amount, 2);
 
+        // Concurrency-safe availability check using transaction
+        $DB->begin_transaction();
+        $roomRow = $DB->query("SELECT id, quantity FROM rooms WHERE id=".$DB->real_escape_string($room_id)." AND status='active' FOR UPDATE")->fetch_assoc();
+        if(!$roomRow){
+            $DB->rollback();
+            if($isAjax){ sendError('Room not available'); } else { header('Location: /public/index.php?error=' . urlencode('Room not available')); exit; }
+        }
+        $total_quantity = intval($roomRow['quantity'] ?? 1);
+
+        $conflictsRes = $DB->query("SELECT id, checkin, checkout, status FROM bookings 
+                                    WHERE room_id=".$DB->real_escape_string($room_id)."
+                                    AND status <> 'cancelled'
+                                    AND ((checkin <= '$checkin' AND checkout > '$checkin')
+                                     OR (checkin < '$checkout' AND checkout >= '$checkout')
+                                     OR (checkin >= '$checkin' AND checkout <= '$checkout'))
+                                    FOR UPDATE");
+        $conflicts = [];
+        while($row = $conflictsRes->fetch_assoc()){ $conflicts[] = $row; }
+        $booked_count = count($conflicts);
+        $available_count = max(0, $total_quantity - $booked_count);
+
+        if($available_count <= 0){
+            $DB->rollback();
+            $conflictMsg = 'Room is currently occupied for the selected dates.';
+            $details = array_map(function($c){
+                return '#' . $c['id'] . ' [' . $c['status'] . '] ' . $c['checkin'] . ' → ' . $c['checkout'];
+            }, array_slice($conflicts, 0, 3));
+            $payload = ['success'=>false,'error'=>$conflictMsg,'status'=>'occupied','conflicts'=>$details,'http_status'=>409];
+            if($isAjax){ http_response_code(409); sendJsonResponse($payload, 409); }
+            else { header('Location: /public/index.php?error=' . urlencode($conflictMsg . (count($details)? (' Conflicts: ' . implode('; ', $details)) : ''))); exit; }
+        }
+
         // bank proof upload if given
         $bank_proof_path = null;
         if($payment === 'bank_transfer' && !empty($_FILES['bank_proof']['tmp_name'])){
@@ -179,15 +212,16 @@ if($action === 'create_booking'){
             }
         }
         
-        // Prepare SQL based on whether identity_card column exists
+        // Prepare normal INSERT under the lock
+        $status = ($payment === 'cash') ? 'paid' : 'pending';
         if($hasIdentityColumn){
             $stmt = $DB->prepare("INSERT INTO bookings (room_id,customer_name,customer_email,customer_phone,checkin,checkout,nights,total,gst_rate,gst_amount,status,payment_method,bank_proof,identity_card) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-            $status = ($payment === 'cash') ? 'paid' : 'pending';
-            $stmt->bind_param('issssiidddssss',$room_id,$name,$email,$phone,$checkin,$checkout,$nights,$total,$gst,$gst_amount,$status,$payment,$bank_proof_path,$identity_card_path);
+            if(!$stmt){ error_log('Prepare failed: '.$DB->error); $DB->rollback(); sendError('Server error',500); }
+            $stmt->bind_param('isssssidddssss',$room_id,$name,$email,$phone,$checkin,$checkout,$nights,$total,$gst,$gst_amount,$status,$payment,$bank_proof_path,$identity_card_path);
         } else {
             $stmt = $DB->prepare("INSERT INTO bookings (room_id,customer_name,customer_email,customer_phone,checkin,checkout,nights,total,gst_rate,gst_amount,status,payment_method,bank_proof) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
-            $status = ($payment === 'cash') ? 'paid' : 'pending';
-            $stmt->bind_param('issssiidddsss',$room_id,$name,$email,$phone,$checkin,$checkout,$nights,$total,$gst,$gst_amount,$status,$payment,$bank_proof_path);
+            if(!$stmt){ error_log('Prepare failed: '.$DB->error); $DB->rollback(); sendError('Server error',500); }
+            $stmt->bind_param('isssssidddsss',$room_id,$name,$email,$phone,$checkin,$checkout,$nights,$total,$gst,$gst_amount,$status,$payment,$bank_proof_path);
         }
         
         // Debug: Log before execute
@@ -195,6 +229,7 @@ if($action === 'create_booking'){
         
         if($stmt->execute()){
             $booking_id = $DB->insert_id;
+            $DB->commit();
             error_log("Booking saved successfully with ID: " . $booking_id);
             if($isAjax){
                 sendJsonResponse([
@@ -207,13 +242,9 @@ if($action === 'create_booking'){
                 exit;
             }
         } else {
+            $DB->rollback();
             $error_msg = 'Database error: ' . $DB->error;
-            if($isAjax){
-                sendError($error_msg);
-            } else {
-                header('Location: /public/index.php?error=' . urlencode($error_msg));
-                exit;
-            }
+            if($isAjax){ sendError($error_msg); } else { header('Location: /public/index.php?error=' . urlencode($error_msg)); exit; }
         }
     } catch(Exception $e) {
         if($isAjax){
@@ -278,6 +309,38 @@ if($action === 'list_events'){
     echo json_encode($events); exit;
 }
 
+// Centralized availability: returns available counts per room for a date range
+if($action === 'availability_status'){
+    header('Content-Type: application/json');
+    $checkin = $_GET['checkin'] ?? date('Y-m-d');
+    $checkout = $_GET['checkout'] ?? date('Y-m-d', strtotime('+1 day'));
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $checkin) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $checkout)) {
+        sendJsonResponse(['error'=>'invalid_date'], 400);
+    }
+    $rooms = $DB->query("SELECT id, code, title, quantity FROM rooms WHERE status='active' ORDER BY id")->fetch_all(MYSQLI_ASSOC);
+    $result = [];
+    foreach($rooms as $room){
+        $rid = intval($room['id']);
+        $total_quantity = intval($room['quantity'] ?? 1);
+        $conflicts = $DB->query("SELECT id FROM bookings 
+                                  WHERE room_id=$rid 
+                                  AND status <> 'cancelled' 
+                                  AND ((checkin <= '$checkin' AND checkout > '$checkin') 
+                                   OR (checkin < '$checkout' AND checkout >= '$checkout')
+                                   OR (checkin >= '$checkin' AND checkout <= '$checkout'))")->num_rows;
+        $available_count = max(0, $total_quantity - intval($conflicts));
+        $result[] = [
+            'room_id' => $rid,
+            'code' => $room['code'],
+            'title' => $room['title'],
+            'available' => $available_count,
+            'total' => $total_quantity
+        ];
+    }
+    echo json_encode(['checkin'=>$checkin,'checkout'=>$checkout,'generated_at'=>date('c'),'rooms'=>$result]);
+    exit;
+}
+
 // Check room availability considering quantity
 if($action === 'check_availability'){
     header('Content-Type: application/json');
@@ -297,13 +360,14 @@ if($action === 'check_availability'){
     
     $total_quantity = intval($room['quantity'] ?? 1);
     
-    // Count how many rooms are booked for the given dates
-    $booked_count = $DB->query("SELECT COUNT(*) as count FROM bookings 
+    // Collect conflicting bookings
+    $conflicts = $DB->query("SELECT id, checkin, checkout, status FROM bookings 
                                 WHERE room_id=$room_id 
                                 AND status <> 'cancelled' 
                                 AND ((checkin <= '$checkin' AND checkout > '$checkin') 
                                 OR (checkin < '$checkout' AND checkout >= '$checkout')
-                                OR (checkin >= '$checkin' AND checkout <= '$checkout'))")->fetch_assoc()['count'];
+                                OR (checkin >= '$checkin' AND checkout <= '$checkout'))")->fetch_all(MYSQLI_ASSOC);
+    $booked_count = count($conflicts);
     
     $available = ($total_quantity - intval($booked_count)) > 0;
     $available_count = max(0, $total_quantity - intval($booked_count));
@@ -312,7 +376,8 @@ if($action === 'check_availability'){
         'available' => $available,
         'available_count' => $available_count,
         'total_quantity' => $total_quantity,
-        'booked_count' => intval($booked_count)
+        'booked_count' => intval($booked_count),
+        'conflicts' => array_map(function($c){ return ['id'=>$c['id'],'status'=>$c['status'],'checkin'=>$c['checkin'],'checkout'=>$c['checkout']]; }, $conflicts)
     ]);
 }
 
@@ -431,6 +496,7 @@ if($action === 'delete_booking'){
     $result = $DB->query("DELETE FROM bookings WHERE id=$id");
     
     if($result){
+        error_log("Booking deleted id=".$id);
         sendJsonResponse(['success'=>true, 'msg'=>'Booking deleted successfully']);
     } else {
         sendJsonResponse(['success'=>false, 'msg'=>'Failed to delete booking: ' . $DB->error]);
@@ -448,6 +514,7 @@ if($action === 'update_status'){
     $status = $_POST['status'] ?? '';
     if(in_array($status, ['pending','paid','confirmed','cancelled'])){
         $DB->query("UPDATE bookings SET status='".$DB->real_escape_string($status)."' WHERE id=$id");
+        error_log("Booking status updated id=".$id." status=".$status);
         echo json_encode(['success'=>true]);
     } else {
         echo json_encode(['success'=>false,'msg'=>'Invalid status']);

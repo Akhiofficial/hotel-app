@@ -10,7 +10,20 @@ if(!$b){ echo "Booking not found"; exit; }
 
 $pdf = isset($_GET['pdf']) && $_GET['pdf'] == '1';
 $subtotal = $b['total'] - $b['gst_amount'];
-$roomRate = $subtotal / $b['nights'];
+$roomRate = ($b['nights'] > 0) ? ($subtotal / $b['nights']) : $subtotal;
+
+// Safe date displays with fallback
+$checkinDisplay = (!empty($b['checkin']) && $b['checkin'] !== '0000-00-00') ? date('M d, Y', strtotime($b['checkin'])) : 'N/A';
+$checkoutDisplay = '';
+if(!empty($b['checkout']) && $b['checkout'] !== '0000-00-00'){
+    $checkoutDisplay = date('M d, Y', strtotime($b['checkout']));
+} else {
+    if(!empty($b['checkin']) && !empty($b['nights']) && intval($b['nights']) >= 1){
+        $checkoutDisplay = date('M d, Y', strtotime('+'.intval($b['nights']).' day', strtotime($b['checkin'])));
+    } else {
+        $checkoutDisplay = 'Not checked out';
+    }
+}
 
 // Build HTML conditionally - exclude buttons for PDF
 $actionButtons = '';
@@ -158,11 +171,16 @@ $invoice_html = '
             color: #808080; 
         }
         .status-badge { 
-            display: inline-block; 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 6px; 
             padding: 8px 20px; 
             border-radius: 25px; 
             font-weight: bold; 
             font-size: 13px; 
+            line-height: 1.2; 
+            margin: 4px 0; 
+            white-space: nowrap; 
         }
         .status-paid { 
             background: #D4EDDA; 
@@ -258,8 +276,8 @@ $invoice_html = '
                         <strong>'.htmlspecialchars($b['room_title'] ?? 'N/A', ENT_QUOTES, 'UTF-8').'</strong><br>
                         <small style="color: #808080;">Room Code: '.htmlspecialchars($b['room_code'] ?? 'N/A', ENT_QUOTES, 'UTF-8').'</small>
                     </td>
-                    <td class="text-right">'.date('M d, Y', strtotime($b['checkin'])).'</td>
-                    <td class="text-right">'.(!empty($b['checkout']) && $b['checkout'] !== '0000-00-00' ? date('M d, Y', strtotime($b['checkout'])) : 'N/A').'</td>
+                    <td class="text-right">'.$checkinDisplay.'</td>
+                    <td class="text-right">'.$checkoutDisplay.'</td>
                     <td class="text-right">'.intval($b['nights']).'</td>
                     <td class="text-right">Rs. '.number_format($roomRate, 2).'</td>
                     <td class="text-right"><strong>Rs. '.number_format($subtotal, 2).'</strong></td>

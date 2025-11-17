@@ -15,49 +15,74 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     $checkin = $_POST['checkin'] ?? null;
     $checkout = $_POST['checkout'] ?? null;
     $payment = $_POST['payment_method'] ?? 'cash';
-    
+
     if(empty($room_id) || empty($name) || empty($email) || empty($phone) || empty($checkin) || empty($checkout)){
         $error = 'All fields are required';
     } else {
-        // Check if room is available
-        $checkConflict = $DB->query("SELECT id FROM bookings WHERE room_id=$room_id 
-                                     AND status <> 'cancelled' 
-                                     AND ((checkin <= '$checkin' AND checkout > '$checkin') 
-                                     OR (checkin < '$checkout' AND checkout >= '$checkout')
-                                     OR (checkin >= '$checkin' AND checkout <= '$checkout'))")->num_rows;
-        
-        if($checkConflict > 0){
-            $error = 'Room is not available for the selected dates';
-        } else {
-            // Calculate nights and total
+        // Validate date order
+        try {
             $d1 = new DateTime($checkin);
             $d2 = new DateTime($checkout);
+            if($d2 <= $d1){
+                $error = 'Check-out date must be after check-in date';
+            }
+        } catch(Exception $e){
+            $error = 'Invalid dates provided';
+        }
+
+        if(!$error){
+            // Calculate nights and totals
             $diff = $d1->diff($d2);
             $nights = max(1, intval($diff->days));
-            
-            $room = $DB->query("SELECT * FROM rooms WHERE id=$room_id")->fetch_assoc();
-            if($room){
-                $room_price = floatval($room['price']);
-                $subtotal = $room_price * $nights;
-                $gst = floatval($config['default_gst']);
-                $gst_amount = round($subtotal * $gst / 100, 2);
-                $total = round($subtotal + $gst_amount, 2);
-                
-                $status = ($payment === 'cash') ? 'paid' : 'pending';
-                
-                $stmt = $DB->prepare("INSERT INTO bookings (room_id,customer_name,customer_email,customer_phone,checkin,checkout,nights,total,gst_rate,gst_amount,status,payment_method) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
-                $stmt->bind_param('issssiidddss',$room_id,$name,$email,$phone,$checkin,$checkout,$nights,$total,$gst,$gst_amount,$status,$payment);
-                
-                if($stmt->execute()){
-                    $booking_id = $DB->insert_id;
-                    $success = true;
-                    header('Location: bookings.php?success=1&id=' . $booking_id);
-                    exit;
-                } else {
-                    $error = 'Database error: ' . $DB->error;
-                }
+
+            // Concurrency-safe availability check and insert
+            $DB->begin_transaction();
+            $roomRow = $DB->query("SELECT id, quantity, price FROM rooms WHERE id=".$DB->real_escape_string($room_id)." AND status='active' FOR UPDATE")->fetch_assoc();
+            if(!$roomRow){
+                $DB->rollback();
+                $error = 'Room not found or inactive';
             } else {
-                $error = 'Room not found';
+                $total_quantity = intval($roomRow['quantity'] ?? 1);
+                $conflictsRes = $DB->query("SELECT id FROM bookings 
+                                            WHERE room_id=".$DB->real_escape_string($room_id)."
+                                              AND status <> 'cancelled'
+                                              AND ((checkin <= '".$DB->real_escape_string($checkin)."' AND checkout > '".$DB->real_escape_string($checkin)."')
+                                               OR (checkin < '".$DB->real_escape_string($checkout)."' AND checkout >= '".$DB->real_escape_string($checkout)."')
+                                               OR (checkin >= '".$DB->real_escape_string($checkin)."' AND checkout <= '".$DB->real_escape_string($checkout)."'))
+                                            FOR UPDATE");
+                $booked_count = $conflictsRes ? $conflictsRes->num_rows : 0;
+                $available_count = max(0, $total_quantity - $booked_count);
+
+                if($available_count <= 0){
+                    $DB->rollback();
+                    $error = 'Room is not available for the selected dates';
+                } else {
+                    $room_price = floatval($roomRow['price']);
+                    $subtotal = $room_price * $nights;
+                    $gst = floatval($config['default_gst']);
+                    $gst_amount = round($subtotal * $gst / 100, 2);
+                    $total = round($subtotal + $gst_amount, 2);
+
+                    $status = ($payment === 'cash') ? 'paid' : 'pending';
+                    $stmt = $DB->prepare("INSERT INTO bookings (room_id,customer_name,customer_email,customer_phone,checkin,checkout,nights,total,gst_rate,gst_amount,status,payment_method) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+                    if(!$stmt){
+                        $DB->rollback();
+                        $error = 'Database error: '.$DB->error;
+                    } else {
+                        $stmt->bind_param('issssiidddss',$room_id,$name,$email,$phone,$checkin,$checkout,$nights,$total,$gst,$gst_amount,$status,$payment);
+                        if($stmt->execute()){
+                            $booking_id = $DB->insert_id;
+                            $DB->commit();
+                            error_log("Admin booking created: room=".$room_id." checkin=".$checkin." checkout=".$checkout." id=".$booking_id);
+                            $success = true;
+                            header('Location: bookings.php?success=1&capacity_updated=1&id=' . $booking_id);
+                            exit;
+                        } else {
+                            $DB->rollback();
+                            $error = 'Database error: ' . $DB->error;
+                        }
+                    }
+                }
             }
         }
     }

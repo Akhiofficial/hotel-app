@@ -329,21 +329,7 @@ $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
                         <?php endif; ?>
                     </div>
                     
-                    <div class="glance-card-footer">
-                        <?php if($room['is_occupied'] && !empty($room['current_booking'])): ?>
-                            <a href="bookings.php#booking-<?=esc($room['current_booking']['id'])?>" class="btn-view-booking">
-                                <i class="fas fa-eye"></i> View Booking
-                            </a>
-                        <?php elseif($room['is_fully_occupied'] && !empty($room['next_booking'])): ?>
-                            <a href="bookings.php#booking-<?=esc($room['next_booking']['id'])?>" class="btn-view-booking">
-                                <i class="fas fa-eye"></i> View Next Booking
-                            </a>
-                        <?php else: ?>
-                            <a href="create-booking.php?room_id=<?=esc($room['id'])?>" class="btn-book-room">
-                                <i class="fas fa-plus"></i> Book Now
-                            </a>
-                        <?php endif; ?>
-                    </div>
+                    <div class="glance-card-footer"></div>
                 </div>
                 <?php endforeach; ?>
             </div>
