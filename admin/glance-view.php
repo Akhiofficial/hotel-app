@@ -91,7 +91,7 @@ foreach($rooms as &$room) {
     
     // Get next upcoming booking if not currently occupied and not fully booked
     if(!$room['is_occupied'] && $room['available_count'] > 0) {
-        $room['next_booking'] = $DB->query("SELECT b.*, r.title as room_title 
+        $room['next_booking'] = $DB->query("SELECT b.*, r.title as room_title   
                                             FROM bookings b 
                                             LEFT JOIN rooms r ON r.id = b.room_id 
                                             WHERE b.room_id = {$room['id']} 
@@ -193,12 +193,6 @@ $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
             <div class="page-header">
                 <h1><i class="fas fa-eye"></i> Room Occupancy Glance View</h1>
                 <p>Quick overview of all room statuses - <?=date('F d, Y')?> 
-                    <span id="lastUpdate" style="color: #666; font-size: 14px; margin-left: 10px;">
-                        <i class="fas fa-sync-alt"></i> Auto-refreshing every 30 seconds
-                    </span>
-                    <a href="?debug=<?=$debug_mode ? '0' : '1'?>" style="margin-left: 15px; font-size: 12px; color: #007bff;">
-                        <?=$debug_mode ? 'Hide Debug' : 'Show Debug'?>
-                    </a>
                 </p>
             </div>
 
@@ -303,121 +297,34 @@ $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
                     </div>
                     
                     <div class="glance-card-body">
-                        <?php if($room['is_occupied'] && !empty($room['current_booking'])): 
-                            $booking = $room['current_booking'];
+                        <?php if(intval($room['available_count']) === 0): ?>
+                        <div class="glance-detail-row">
+                            <i class="fas fa-exclamation-triangle" style="color:#dc3545;"></i>
+                            <span><strong style="color:#dc3545;">Fully Booked</strong></span>
+                        </div>
+                        <?php endif; ?>
+
+                        <div class="glance-detail-row">
+                            <i class="fas fa-bed"></i>
+                            <span>
+                                <strong>Available:</strong>
+                                <?=esc($room['available_count'])?> / <?=esc($room['quantity'] ?? 1)?> rooms
+                            </span>
+                        </div>
+                        <div class="glance-detail-row">
+                            <i class="fas fa-users"></i>
+                            <span><strong>Capacity:</strong> <?=$room['capacity']?> guest(s)</span>
+                        </div>
+                        <div class="glance-detail-row">
+                            <i class="fas fa-rupee-sign"></i>
+                            <span><strong>Price:</strong> ₹<?=number_format($room['price'], 2)?>/night</span>
+                        </div>
+                        <?php if(!empty($room['next_booking'])): 
+                            $nextBooking = $room['next_booking'];
                         ?>
-                            <div class="glance-booking-details">
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-bed"></i>
-                                    <span><strong>Available:</strong> <?=esc($room['available_count'])?> / <?=esc($room['quantity'] ?? 1)?> rooms</span>
-                                </div>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-user"></i>
-                                    <span><strong>Guest:</strong> <?=esc($booking['customer_name'])?></span>
-                                </div>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-calendar-check"></i>
-                                    <span><strong>Check-in:</strong> <?=date('M d, Y', strtotime($booking['checkin']))?></span>
-                                </div>
-                                <?php if($booking['checkout'] && $booking['checkout'] !== '0000-00-00'): ?>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-calendar-times"></i>
-                                    <span><strong>Check-out:</strong> <?=date('M d, Y', strtotime($booking['checkout']))?></span>
-                                </div>
-                                <?php else: ?>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-calendar-times"></i>
-                                    <span><strong>Check-out:</strong> <span style="color: #ffc107;">Not set</span></span>
-                                </div>
-                                <?php endif; ?>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-phone"></i>
-                                    <span><?=esc($booking['customer_phone'])?></span>
-                                </div>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-rupee-sign"></i>
-                                    <span>₹<?=number_format($booking['total'], 2)?></span>
-                                </div>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-info-circle"></i>
-                                    <span><strong>Status:</strong> <span style="text-transform: capitalize; color: <?=$booking['status'] === 'confirmed' ? '#28a745' : '#007bff'?>;"><?=esc($booking['status'])?></span></span>
-                                </div>
-                            </div>
-                        <?php elseif($room['is_fully_occupied'] && !empty($room['next_booking'])): 
-                            // Fully booked but no current active booking - show next booking
-                            $booking = $room['next_booking'];
-                        ?>
-                            <div class="glance-booking-details">
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-exclamation-triangle" style="color: #ffc107;"></i>
-                                    <span><strong style="color: #dc3545;">Fully Booked</strong></span>
-                                </div>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-bed"></i>
-                                    <span><strong>Available:</strong> <span style="color: #dc3545;">0/<?=$room['quantity'] ?? 1?> rooms</span></span>
-                                </div>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-user"></i>
-                                    <span><strong>Next Guest:</strong> <?=esc($booking['customer_name'])?></span>
-                                </div>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-calendar-check"></i>
-                                    <span><strong>Check-in:</strong> <?=date('M d, Y', strtotime($booking['checkin']))?></span>
-                                </div>
-                                <?php if($booking['checkout'] && $booking['checkout'] !== '0000-00-00'): ?>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-calendar-times"></i>
-                                    <span><strong>Check-out:</strong> <?=date('M d, Y', strtotime($booking['checkout']))?></span>
-                                </div>
-                                <?php endif; ?>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-info-circle"></i>
-                                    <span><strong>Status:</strong> <span style="text-transform: capitalize; color: <?=$booking['status'] === 'confirmed' ? '#28a745' : '#007bff'?>;"><?=esc($booking['status'])?></span></span>
-                                </div>
-                            </div>
-                        <?php elseif($room['is_fully_occupied']): 
-                            // Fully booked but no booking details available
-                        ?>
-                            <div class="glance-available-details">
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-exclamation-triangle" style="color: #dc3545;"></i>
-                                    <span><strong style="color: #dc3545;">Fully Booked</strong></span>
-                                </div>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-bed"></i>
-                                    <span><strong>Available:</strong> <span style="color: #dc3545;">0/<?=$room['quantity'] ?? 1?> rooms</span></span>
-                                </div>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-users"></i>
-                                    <span><strong>Capacity:</strong> <?=$room['capacity']?> guest(s)</span>
-                                </div>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-rupee-sign"></i>
-                                    <span><strong>Price:</strong> ₹<?=number_format($room['price'], 2)?>/night</span>
-                                </div>
-                            </div>
-                        <?php else: ?>
-                            <div class="glance-available-details">
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-bed"></i>
-                                    <span><strong>Available:</strong> <span id="available-<?=esc($room['id'])?>"><?=$room['available_count']?></span>/<?=$room['quantity'] ?? 1?> rooms</span>
-                                </div>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-users"></i>
-                                    <span><strong>Capacity:</strong> <?=$room['capacity']?> guest(s)</span>
-                                </div>
-                                <div class="glance-detail-row">
-                                    <i class="fas fa-rupee-sign"></i>
-                                    <span><strong>Price:</strong> ₹<?=number_format($room['price'], 2)?>/night</span>
-                                </div>
-                                <?php if(!empty($room['next_booking'])): 
-                                    $nextBooking = $room['next_booking'];
-                                ?>
-                                    <div class="upcoming-booking">
-                                        <i class="fas fa-calendar-alt" style="color: #ffc107;"></i>
-                                        <strong>Upcoming:</strong> <?=esc($nextBooking['customer_name'])?> on <?=date('M d, Y', strtotime($nextBooking['checkin']))?>
-                                    </div>
-                                <?php endif; ?>
+                            <div class="upcoming-booking">
+                                <i class="fas fa-calendar-alt" style="color: #ffc107;"></i>
+                                <strong>Upcoming:</strong> <?=esc($nextBooking['customer_name'])?> on <?=date('M d, Y', strtotime($nextBooking['checkin']))?>
                             </div>
                         <?php endif; ?>
                     </div>

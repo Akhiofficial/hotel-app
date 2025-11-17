@@ -132,7 +132,7 @@ $recentBookings = $DB->query("SELECT b.*, r.title as room_title FROM bookings b 
                     </div>
 
                     <!-- Room Management Table -->
-                    <div class="card">
+                    <!-- <div class="card">
                         <div class="card-header">
                             <h3><i class="fas fa-bed"></i> Room Management</h3>
                             <a href="rooms.php" class="btn-primary">
@@ -191,7 +191,7 @@ $recentBookings = $DB->query("SELECT b.*, r.title as room_title FROM bookings b 
                                 </table>
                             </div>
                         </div>
-                    </div>
+                    </div> -->
                 </div>
 
                 <!-- Right Column -->
@@ -310,7 +310,7 @@ $recentBookings = $DB->query("SELECT b.*, r.title as room_title FROM bookings b 
     <script src="admin-scripts.js"></script>
     
     <!-- Load FullCalendar with proper callback -->
-    <script>
+<script>
     // Initialize charts
     let revenueChart;
     let calendar;
@@ -417,9 +417,9 @@ $recentBookings = $DB->query("SELECT b.*, r.title as room_title FROM bookings b 
                 if(revenueChart) revenueChart.destroy();
                 
                 revenueChart = new Chart(chartCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: data.labels,
+        type: 'bar',
+        data: {
+          labels: data.labels,
                         datasets: [
                             {
                                 label: 'Revenue',
@@ -590,7 +590,7 @@ $recentBookings = $DB->query("SELECT b.*, r.title as room_title FROM bookings b 
             initCalendar();
             // Setup other event handlers
             setupEventHandlers();
-        });
+      });
     });
     
     function refreshCalendar() {
@@ -621,6 +621,6 @@ $recentBookings = $DB->query("SELECT b.*, r.title as room_title FROM bookings b 
             }
         });
     }
-    </script>
+</script>
 </body>
 </html>
