@@ -308,6 +308,10 @@ $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
                         ?>
                             <div class="glance-booking-details">
                                 <div class="glance-detail-row">
+                                    <i class="fas fa-bed"></i>
+                                    <span><strong>Available:</strong> <?=esc($room['available_count'])?> / <?=esc($room['quantity'] ?? 1)?> rooms</span>
+                                </div>
+                                <div class="glance-detail-row">
                                     <i class="fas fa-user"></i>
                                     <span><strong>Guest:</strong> <?=esc($booking['customer_name'])?></span>
                                 </div>

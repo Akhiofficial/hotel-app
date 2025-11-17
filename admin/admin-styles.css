@@ -1369,3 +1369,27 @@ body {
     background: #45a03d;
     transform: translateY(-2px);
 }
+
+.room-card-body .availability-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.availability-pill {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.pill-available {
+    background: #e7f6ec;
+    color: #2e7d32;
+}
+
+.pill-full {
+    background: #fdecea;
+    color: #c62828;
+}
