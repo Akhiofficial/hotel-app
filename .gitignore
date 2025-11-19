@@ -1,0 +1,9 @@
+vendor/
+public/uploads/
+error.log
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.env
