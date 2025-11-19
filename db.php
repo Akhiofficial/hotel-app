@@ -1,4 +1,9 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+if (!ini_get('error_log')) { ini_set('error_log', __DIR__ . '/error.log'); }
+
 // db.php
 $config = require __DIR__ . '/config.php';
 $DB = new mysqli($config['db']['host'],$config['db']['user'],$config['db']['pass'],$config['db']['name'],$config['db']['port']);

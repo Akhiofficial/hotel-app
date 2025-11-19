@@ -1,6 +1,4 @@
 -- install.sql - MySQL schema & sample data
-CREATE DATABASE IF NOT EXISTS hotel_app CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE hotel_app;
 
 -- admin config (optional table for flexible admin users)
 CREATE TABLE IF NOT EXISTS admins (
