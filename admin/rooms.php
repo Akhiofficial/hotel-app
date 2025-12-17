@@ -114,13 +114,14 @@ SELECT COUNT(*) AS count
 FROM bookings b
 WHERE b.room_id = {$room['id']}
   AND b.status <> 'cancelled'
+  AND (b.archived_at IS NULL)
   AND b.checkin IS NOT NULL
   AND b.checkin <> '0000-00-00'
-  AND '$today' >= b.checkin
+  AND DATE('$today') >= DATE(b.checkin)
   AND (
         b.checkout IS NULL
      OR b.checkout = '0000-00-00'
-     OR '$today' < b.checkout
+     OR DATE('$today') < DATE(b.checkout)
   )
 ")->fetch_assoc()['count'];
     
@@ -144,8 +145,16 @@ unset($room); // Break reference
 <body>
     <?php include 'admin-header.php'; ?>
     
+    <!-- Mobile Sidebar Toggle -->
+    <button class="mobile-sidebar-toggle" id="mobileSidebarToggle" aria-label="Toggle sidebar">
+        <i class="fas fa-bars"></i>
+    </button>
+    
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    
     <div class="admin-container">
-        <div class="admin-sidebar">
+        <div class="admin-sidebar" id="adminSidebar">
             <?php include 'admin-sidebar.php'; ?>
         </div>
         
@@ -323,3 +332,7 @@ unset($room); // Break reference
     <script src="admin-scripts.js"></script>
 </body>
 </html>
+$check_archived = $DB->query("SHOW COLUMNS FROM bookings LIKE 'archived_at'");
+if($check_archived->num_rows == 0){
+    $DB->query("ALTER TABLE bookings ADD COLUMN archived_at DATETIME DEFAULT NULL AFTER status");
+}

@@ -7,6 +7,11 @@ if(empty($_SESSION['admin'])){ header('Location: login.php'); exit; }
 $rooms = $DB->query("SELECT * FROM rooms WHERE status='active' ORDER BY code")->fetch_all(MYSQLI_ASSOC);
 $selectedDate = $_GET['date'] ?? '';
 
+$col = $DB->query("SHOW COLUMNS FROM bookings LIKE 'archived_at'");
+if(!$col || $col->num_rows === 0){
+    $DB->query("ALTER TABLE bookings ADD COLUMN archived_at DATETIME DEFAULT NULL AFTER status");
+}
+
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
     $room_id = intval($_POST['room_id'] ?? 0);
     $name = trim($_POST['customer_name'] ?? '');
@@ -73,6 +78,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
                     $booked_count = $DB->query("SELECT COUNT(*) as count FROM bookings 
                                                WHERE room_id=$room_id 
                                                AND status <> 'cancelled' 
+                                               AND (archived_at IS NULL)
                                                AND ((checkin <= '$checkin' AND checkout > '$checkin') 
                                                OR (checkin < '$checkout' AND checkout >= '$checkout')
                                                OR (checkin >= '$checkin' AND checkout <= '$checkout'))")->fetch_assoc()['count'];
@@ -141,8 +147,16 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
 <body>
     <?php include 'admin-header.php'; ?>
     
+    <!-- Mobile Sidebar Toggle -->
+    <button class="mobile-sidebar-toggle" id="mobileSidebarToggle" aria-label="Toggle sidebar">
+        <i class="fas fa-bars"></i>
+    </button>
+    
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    
     <div class="admin-container">
-        <div class="admin-sidebar">
+        <div class="admin-sidebar" id="adminSidebar">
             <?php include 'admin-sidebar.php'; ?>
         </div>
         

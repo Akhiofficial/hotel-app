@@ -11,6 +11,11 @@ require_once __DIR__ . '/../db.php';
 $config = require __DIR__ . '/../config.php';
 $action = $_GET['action'] ?? $_POST['action'] ?? null;
 
+$col = $DB->query("SHOW COLUMNS FROM bookings LIKE 'archived_at'");
+if(!$col || $col->num_rows === 0){
+    $DB->query("ALTER TABLE bookings ADD COLUMN archived_at DATETIME DEFAULT NULL AFTER status");
+}
+
 // Only set JSON header if it's an AJAX request
 $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
 
@@ -272,6 +277,7 @@ if($action === 'list_events'){
                        (SELECT COUNT(*) FROM bookings b2 
                         WHERE b2.room_id = b.room_id 
                         AND b2.status <> 'cancelled' 
+                        AND (b2.archived_at IS NULL)
                         AND b2.checkin <= '$today' 
                         AND b2.checkout > '$today'
                         AND b2.id = b.id) as is_currently_occupied
@@ -325,9 +331,10 @@ if($action === 'availability_status'){
         $conflicts = $DB->query("SELECT id FROM bookings 
                                   WHERE room_id=$rid 
                                   AND status <> 'cancelled' 
-                                  AND ((checkin <= '$checkin' AND checkout > '$checkin') 
-                                   OR (checkin < '$checkout' AND checkout >= '$checkout')
-                                   OR (checkin >= '$checkin' AND checkout <= '$checkout'))")->num_rows;
+                                   AND (archived_at IS NULL)
+                                   AND ((checkin <= '$checkin' AND checkout > '$checkin') 
+                                    OR (checkin < '$checkout' AND checkout >= '$checkout')
+                                    OR (checkin >= '$checkin' AND checkout <= '$checkout'))")->num_rows;
         $available_count = max(0, $total_quantity - intval($conflicts));
         $result[] = [
             'room_id' => $rid,
@@ -364,6 +371,7 @@ if($action === 'check_availability'){
     $conflicts = $DB->query("SELECT id, checkin, checkout, status FROM bookings 
                                 WHERE room_id=$room_id 
                                 AND status <> 'cancelled' 
+                                AND (archived_at IS NULL)
                                 AND ((checkin <= '$checkin' AND checkout > '$checkin') 
                                 OR (checkin < '$checkout' AND checkout >= '$checkout')
                                 OR (checkin >= '$checkin' AND checkout <= '$checkout'))")->fetch_all(MYSQLI_ASSOC);

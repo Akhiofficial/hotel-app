@@ -3,8 +3,23 @@ session_start();
 require_once __DIR__ . '/../db.php';
 if(empty($_SESSION['admin'])){ header('Location: login.php'); exit; }
 
+$col = $DB->query("SHOW COLUMNS FROM bookings LIKE 'archived_at'");
+if(!$col || $col->num_rows === 0){
+    $DB->query("ALTER TABLE bookings ADD COLUMN archived_at DATETIME DEFAULT NULL AFTER status");
+}
+
 $statusFilter = $_GET['status'] ?? 'all';
-$whereClause = $statusFilter !== 'all' ? "WHERE b.status='" . $DB->real_escape_string($statusFilter) . "'" : "";
+$whereClause = "WHERE 1=1";
+if($statusFilter !== 'all'){
+    if($statusFilter === 'archived'){
+        $whereClause .= " AND b.archived_at IS NOT NULL";
+    } else {
+        $whereClause .= " AND b.status='" . $DB->real_escape_string($statusFilter) . "'";
+        $whereClause .= " AND b.archived_at IS NULL";
+    }
+} else {
+    $whereClause .= " AND b.archived_at IS NULL";
+}
 
 $bookings = $DB->query("SELECT b.*, r.title as room_title, r.code as room_code 
                         FROM bookings b 
@@ -57,8 +72,16 @@ function displayCheckout($checkin, $checkout, $nights) {
 <body>
     <?php include 'admin-header.php'; ?>
     
+    <!-- Mobile Sidebar Toggle -->
+    <button class="mobile-sidebar-toggle" id="mobileSidebarToggle" aria-label="Toggle sidebar">
+        <i class="fas fa-bars"></i>
+    </button>
+    
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    
     <div class="admin-container">
-        <div class="admin-sidebar">
+        <div class="admin-sidebar" id="adminSidebar">
             <?php include 'admin-sidebar.php'; ?>
         </div>
         
@@ -72,11 +95,12 @@ function displayCheckout($checkin, $checkout, $nights) {
                     <div class="filter-group">
                         <label>Filter by Status:</label>
                         <select id="statusFilter" onchange="window.location.href='?status='+this.value">
-                            <option value="all" <?=$statusFilter=='all'?'selected':''?>>All Bookings</option>
+                            <option value="all" <?=$statusFilter=='all'?'selected':''?>>All (Active)</option>
                             <option value="pending" <?=$statusFilter=='pending'?'selected':''?>>Pending</option>
                             <option value="paid" <?=$statusFilter=='paid'?'selected':''?>>Paid</option>
                             <option value="confirmed" <?=$statusFilter=='confirmed'?'selected':''?>>Confirmed</option>
                             <option value="cancelled" <?=$statusFilter=='cancelled'?'selected':''?>>Cancelled</option>
+                            <option value="archived" <?=$statusFilter=='archived'?'selected':''?>>Archived</option>
                         </select>
                     </div>
                 </div>

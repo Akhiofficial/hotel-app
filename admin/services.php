@@ -45,8 +45,16 @@ $editService = $editId ? $DB->query("SELECT * FROM services WHERE id=" . intval(
 <body>
     <?php include 'admin-header.php'; ?>
     
+    <!-- Mobile Sidebar Toggle -->
+    <button class="mobile-sidebar-toggle" id="mobileSidebarToggle" aria-label="Toggle sidebar">
+        <i class="fas fa-bars"></i>
+    </button>
+    
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    
     <div class="admin-container">
-        <div class="admin-sidebar">
+        <div class="admin-sidebar" id="adminSidebar">
             <?php include 'admin-sidebar.php'; ?>
         </div>
         

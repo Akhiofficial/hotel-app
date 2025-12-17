@@ -10,29 +10,187 @@ $bookings = $DB->query("SELECT b.*, r.title as room_title, r.code as room_code
 <html>
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Check Bookings</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background: #20B2AA; color: white; }
-        tr:nth-child(even) { background: #f2f2f2; }
-        .status { padding: 5px 10px; border-radius: 4px; font-weight: bold; }
-        .status.pending { background: #fff3cd; color: #856404; }
-        .status.paid { background: #d4edda; color: #155724; }
-        .status.confirmed { background: #d1ecf1; color: #0c5460; }
-        .status.cancelled { background: #f8d7da; color: #721c24; }
-        h1 { color: #20B2AA; }
-        .total { margin-top: 20px; font-size: 18px; font-weight: bold; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        h1 { 
+            color: #20B2AA;
+            margin-bottom: 20px;
+        }
+        
+        .nav-links {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .nav-links a {
+            color: #20B2AA;
+            text-decoration: none;
+            padding: 8px 16px;
+            border: 2px solid #20B2AA;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        
+        .nav-links a:hover {
+            background: #20B2AA;
+            color: white;
+        }
+        
+        .total { 
+            margin-top: 20px; 
+            font-size: 18px; 
+            font-weight: bold;
+            padding: 15px;
+            background: #e8f5f4;
+            border-radius: 4px;
+        }
+        
+        .table-responsive {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+        
+        table { 
+            border-collapse: collapse; 
+            width: 100%; 
+            min-width: 800px;
+        }
+        
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 12px; 
+            text-align: left;
+        }
+        
+        th { 
+            background: #20B2AA; 
+            color: white;
+            font-weight: 600;
+        }
+        
+        tr:nth-child(even) { 
+            background: #f9f9f9;
+        }
+        
+        tr:hover {
+            background: #f0f0f0;
+        }
+        
+        .status { 
+            padding: 5px 10px; 
+            border-radius: 4px; 
+            font-weight: bold;
+            display: inline-block;
+            font-size: 13px;
+        }
+        
+        .status.pending { 
+            background: #fff3cd; 
+            color: #856404;
+        }
+        
+        .status.paid { 
+            background: #d4edda; 
+            color: #155724;
+        }
+        
+        .status.confirmed { 
+            background: #d1ecf1; 
+            color: #0c5460;
+        }
+        
+        .status.cancelled { 
+            background: #f8d7da; 
+            color: #721c24;
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                margin: 10px;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            .nav-links {
+                flex-direction: column;
+            }
+            
+            .nav-links a {
+                text-align: center;
+            }
+            
+            table {
+                font-size: 12px;
+            }
+            
+            th, td {
+                padding: 8px 5px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 20px;
+            }
+            
+            table {
+                font-size: 11px;
+                min-width: 600px;
+            }
+            
+            th, td {
+                padding: 6px 4px;
+            }
+            
+            .status {
+                font-size: 11px;
+                padding: 4px 8px;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>Recent Bookings (Last 50)</h1>
-    <p><a href="index.php">← Back to Home</a> | <a href="/admin/login.php">Admin Panel</a></p>
-    
-    <div class="total">Total Bookings: <?=count($bookings)?></div>
-    
-    <table>
+    <div class="container">
+        <h1>Recent Bookings (Last 50)</h1>
+        <div class="nav-links">
+            <a href="index.php">← Back to Home</a>
+            <a href="/admin/login.php">Admin Panel</a>
+        </div>
+        
+        <div class="total">Total Bookings: <?=count($bookings)?></div>
+        
+        <div class="table-responsive">
+            <table>
         <thead>
             <tr>
                 <th>ID</th>
@@ -76,5 +234,7 @@ $bookings = $DB->query("SELECT b.*, r.title as room_title, r.code as room_code
             <?php endif; ?>
         </tbody>
     </table>
+        </div>
+    </div>
 </body>
 </html>

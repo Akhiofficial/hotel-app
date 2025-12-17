@@ -14,7 +14,8 @@ return [
     // Upload folders (relative)
     'upload_dir'=>'public/uploads',
     // GST default
-    'default_gst'=>18.00
+    'default_gst'=>18.00,
+    'timezone'=>'Asia/Kolkata'
 ];
 
 

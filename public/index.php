@@ -45,7 +45,10 @@ foreach($allRooms as $room) {
     <header class="main-header">
         <div class="container">
             <div class="logo">Hotel reservation system</div>
-            <nav class="main-nav">
+            <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle menu">
+                <i class="fas fa-bars"></i>
+            </button>
+            <nav class="main-nav" id="mainNav">
                 <a href="#" class="active">Home</a>
                 <a href="#rooms">Rooms</a>
                 <a href="check_bookings.php"><i class="fas fa-list-alt"></i> My Bookings</a>

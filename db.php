@@ -6,6 +6,7 @@ if (!ini_get('error_log')) { ini_set('error_log', __DIR__ . '/error.log'); }
 
 // db.php
 $config = require __DIR__ . '/config.php';
+if(isset($config['timezone']) && $config['timezone']){ date_default_timezone_set($config['timezone']); }
 $DB = new mysqli($config['db']['host'],$config['db']['user'],$config['db']['pass'],$config['db']['name'],$config['db']['port']);
 if($DB->connect_errno) {
     die("DB connect error: " . $DB->connect_error);
