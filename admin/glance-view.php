@@ -25,25 +25,21 @@ $rooms = $DB->query("SELECT r.*,
                       AND b.checkin IS NOT NULL 
                       AND b.checkin <> '0000-00-00'
                       AND DATE(b.checkin) <= DATE('$today')
-                      AND (
-                           (b.checkout IS NOT NULL AND b.checkout <> '0000-00-00' AND DATE(b.checkout) > DATE('$today'))
-                        OR ((b.checkout IS NULL OR b.checkout = '0000-00-00') AND DATE(b.checkin) <= DATE('$today'))
-                      )) as total_confirmed_bookings,
+                       AND b.checkout IS NOT NULL 
+                       AND b.checkout <> '0000-00-00' 
+                       AND DATE(b.checkout) > DATE('$today')
+                      ) as total_confirmed_bookings,
                      (SELECT COUNT(*) FROM bookings b 
                       WHERE b.room_id = r.id 
                       AND b.status IN ('confirmed', 'paid')
                       AND (b.archived_at IS NULL)
                       AND b.checkin IS NOT NULL 
                       AND b.checkin <> '0000-00-00'
-                      AND (
-                          (b.checkout IS NOT NULL 
-                           AND b.checkout <> '0000-00-00'
-                           AND DATE(b.checkin) <= DATE('$today')
-                           AND DATE(b.checkout) > DATE('$today'))
-                          OR
-                          ((b.checkout IS NULL OR b.checkout = '0000-00-00')
-                           AND DATE(b.checkin) <= DATE('$today'))
-                      )) as currently_occupied_count
+                       AND b.checkout IS NOT NULL 
+                       AND b.checkout <> '0000-00-00'
+                       AND DATE(b.checkin) <= DATE('$today')
+                       AND DATE(b.checkout) > DATE('$today')
+                      ) as currently_occupied_count
                      FROM rooms r 
                      WHERE r.status='active' 
                      ORDER BY r.code")->fetch_all(MYSQLI_ASSOC);
@@ -72,17 +68,10 @@ foreach ($rooms as &$room) {
                                                AND (b.archived_at IS NULL)
                                                AND b.checkin IS NOT NULL 
                                                AND b.checkin <> '0000-00-00'
-                                               AND (
-                                                   -- Currently active
-                                                   (b.checkout IS NOT NULL 
-                                                    AND b.checkout <> '0000-00-00'
-                                                    AND DATE(b.checkin) <= DATE('$today')
-                                                    AND DATE(b.checkout) > DATE('$today'))
-                                                   OR
-                                                   -- Invalid checkout but checkin is today or past
-                                                   ((b.checkout IS NULL OR b.checkout = '0000-00-00')
-                                                    AND DATE(b.checkin) <= DATE('$today'))
-                                               )
+                                               AND b.checkout IS NOT NULL 
+                                               AND b.checkout <> '0000-00-00'
+                                               AND DATE(b.checkin) <= DATE('$today')
+                                               AND DATE(b.checkout) > DATE('$today')
                                                ORDER BY b.checkin DESC 
                                                LIMIT 1")->fetch_assoc();
     }
@@ -140,9 +129,11 @@ unset($room);
 
 // Separate occupied and available rooms
 $occupiedRooms = array_filter($rooms, function ($r) {
-    return $r['is_occupied']; });
+    return $r['is_occupied'];
+});
 $availableRooms = array_filter($rooms, function ($r) {
-    return !$r['is_occupied']; });
+    return !$r['is_occupied'];
+});
 
 // Debug mode - set to true to see booking details
 $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
@@ -317,7 +308,8 @@ $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
                     <i class="fas fa-th"></i> All Rooms (<span id="allCount"><?= count($rooms) ?></span>)
                 </button>
                 <button class="glance-tab" data-filter="occupied" onclick="filterRooms('occupied')">
-                    <i class="fas fa-bed"></i> Occupied (<span id="occupiedTabCount"><?= count($occupiedRooms) ?></span>)
+                    <i class="fas fa-bed"></i> Occupied (<span
+                        id="occupiedTabCount"><?= count($occupiedRooms) ?></span>)
                 </button>
                 <button class="glance-tab" data-filter="available" onclick="filterRooms('available')">
                     <i class="fas fa-check-circle"></i> Available (<span

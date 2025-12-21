@@ -31,6 +31,8 @@ $rooms = $DB->query("SELECT r.*,
                       AND b.status <> 'cancelled' 
                       AND (b.archived_at IS NULL)
                       AND DATE('$todayDate') >= DATE(b.checkin) 
+                      AND b.checkout IS NOT NULL
+                      AND b.checkout <> '0000-00-00'
                       AND DATE('$todayDate') < DATE(b.checkout)) as is_occupied
                      FROM rooms r 
                      WHERE r.status='active' 
@@ -76,12 +78,12 @@ function displayCheckout($checkin, $checkout, $nights)
 
 <body>
     <?php include 'admin-header.php'; ?>
-    
+
     <!-- Mobile Sidebar Toggle -->
     <button class="mobile-sidebar-toggle" id="mobileSidebarToggle" aria-label="Toggle sidebar">
         <i class="fas fa-bars"></i>
     </button>
-    
+
     <!-- Sidebar Overlay -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
@@ -319,7 +321,8 @@ function displayCheckout($checkin, $checkout, $nights)
                                         </td>
                                         <td data-label="Room"><?= esc($b['room_title'] ?? 'N/A') ?></td>
                                         <td data-label="Check-in"><?= safeDateDisplay($b['checkin']) ?></td>
-                                        <td data-label="Check-out"><?= displayCheckout($b['checkin'], $b['checkout'], $b['nights']) ?></td>
+                                        <td data-label="Check-out">
+                                            <?= displayCheckout($b['checkin'], $b['checkout'], $b['nights']) ?></td>
                                         <td data-label="Amount">₹<?= number_format($b['total'], 2) ?></td>
                                         <td data-label="Status">
                                             <span class="status-badge status-<?= esc($b['status']) ?>">

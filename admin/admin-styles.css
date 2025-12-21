@@ -548,24 +548,25 @@ body {
     }
     
     .data-table tbody td {
-        display: block;
-        text-align: left;
-        padding: 8px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-align: right;
+        padding: 12px 15px;
         border: none;
-        position: relative;
-        padding-left: 50%;
-        min-height: 30px;
+        border-bottom: 1px solid var(--border-color);
+        min-height: auto;
     }
     
     .data-table tbody td:before {
         content: attr(data-label);
-        position: absolute;
-        left: 0;
-        width: 45%;
-        padding-right: 10px;
+        position: static;
+        width: auto;
+        padding-right: 15px;
         font-weight: 600;
         text-align: left;
         color: var(--text-dark);
+        flex-shrink: 0;
     }
     
     .data-table tbody td:first-child {
@@ -748,6 +749,17 @@ body {
     text-decoration: none;
     transition: all 0.3s;
     font-size: 14px;
+}
+
+.btn-icon.confirm-delete {
+    width: auto;
+    padding: 0 12px;
+    background-color: #c0392b;
+    font-size: 12px;
+    font-weight: 600;
+    gap: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 10;
 }
 
 .btn-icon:hover {
@@ -1718,4 +1730,23 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 24px;
+}
+
+
+/* Calendar Responsiveness */
+@media (max-width: 480px) {
+    .fc-header-toolbar {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .fc-toolbar-chunk {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+    }
+    
+    .fc-toolbar-title {
+        font-size: 18px !important;
+    }
 }
