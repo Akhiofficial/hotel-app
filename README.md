@@ -75,3 +75,34 @@ Invoices are generated using `dompdf`.
 ## Notes
 - This is a reference implementation intended for local use with XAMPP.
 - For production, harden configuration, move non-public files outside web root, and enforce authentication and input validation throughout.
+
+## Deployment to InfinityFree
+
+1. **Create an Account**: Sign up at [InfinityFree](https://infinityfree.net/) and create a hosting account.
+2. **Database Setup**:
+   - Go to the Control Panel (VistaPanel).
+   - Click on "MySQL Databases".
+   - Create a new database. Note the *Database Name*, *MySQL User Name*, *MySQL Password*, and *MySQL Host Name*.
+3. **Import SQL**:
+   - Open "phpMyAdmin" from the Control Panel.
+   - Select your new database.
+   - Click "Import" and upload `install.sql`.
+   - Also import any migration files from the `admin/` folder if needed (e.g., `admin/migrate_add_room_image.sql`, etc.).
+4. **Upload Files**:
+   - Open the "Online File Manager" or use an FTP client (like FileZilla).
+   - Navigate to `htdocs`.
+   - Upload all project files *inside* `htdocs`.
+   - *Note*: Ensure the `vendor` folder is uploaded since you cannot run Composer on the free tier.
+   - *Note*: You can exclude `.git` folders.
+5. **Configure Application**:
+   - Open `config.php` on the server (using the file manager's edit option).
+   - Update the database credentials with the values from Step 2:
+     ```php
+     'host' => 'sqlXXX.epizy.com', // Your MySQL Host Name
+     'user' => 'epiz_12345678',    // Your MySQL User Name
+     'pass' => 'your_password',    // Your VPanel Password (found in Client Area)
+     'name' => 'epiz_12345678_XXX' // Your Database Name
+     ```
+6. **Access Site**:
+   - Visit your InfinityFree domain (e.g., `http://your-site.rf.gd/public/`).
+   - Admin panel: `http://your-site.rf.gd/admin/login.php`.
