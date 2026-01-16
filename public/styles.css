@@ -377,9 +377,10 @@ body {
 
 .services-carousel {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 20px;
-    overflow-x: auto;
+    justify-content: center;
+    padding: 0 20px;
 }
 
 .service-card {
@@ -388,6 +389,10 @@ body {
     overflow: hidden;
     height: 300px;
     cursor: pointer;
+    /* Prevent huge stretching on large screens with few items */
+    max-width: 400px;
+    margin: 0 auto;
+    width: 100%;
 }
 
 .service-image {
@@ -783,6 +788,9 @@ body {
     align-items: center;
     justify-content: center;
     z-index: 1000;
+    backdrop-filter: blur(5px);
+    /* Glassmorphism background */
+    transition: opacity 0.3s ease;
 }
 
 .modal-content {
@@ -1008,15 +1016,47 @@ body {
 }
 
 /* Enhanced Modal Form Styles */
+/* Enhanced Modal Form Styles */
+@keyframes modalSlideIn {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
 .modal-content {
-    background: #fff;
-    padding: 30px;
-    border-radius: 12px;
+    background: #ffffff;
+    padding: 35px;
+    border-radius: 24px;
+    /* More rounded */
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    /* Soft, deep shadow for depth */
     min-width: 400px;
-    max-width: 600px;
+    max-width: 550px;
+    width: 90%;
     max-height: 90vh;
     overflow-y: auto;
     position: relative;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    /* Subtle border */
+    animation: modalSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    /* Smooth pop-in */
+
+    /* Hide Scrollbar but keep functionality */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+}
+
+.modal-content::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari and Opera */
 }
 
 .modal-content h2 {
@@ -1039,11 +1079,13 @@ body {
 .form-group input,
 .form-group select {
     width: 100%;
-    padding: 12px;
-    border: 2px solid #e0e0e0;
-    border-radius: 6px;
+    padding: 14px;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    /* Matching rounded theme */
     font-size: 15px;
-    transition: border-color 0.3s;
+    background: #f8f9fa;
+    transition: all 0.3s ease;
 }
 
 .form-group input:focus,
@@ -1201,4 +1243,124 @@ body {
 
 .btn-view-more-icon:active {
     transform: translateY(0) scale(1);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+
+    /* Top Header */
+    .top-header .container {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+
+    .top-header-left {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .top-header-left span {
+        margin-right: 0;
+    }
+
+    .top-header-right {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    /* Main Header */
+    .logo {
+        font-size: 22px;
+    }
+
+    .nav-toggle {
+        display: block;
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: var(--dark-gray);
+        cursor: pointer;
+    }
+
+    .main-nav {
+        position: fixed;
+        top: 0;
+        left: -280px;
+        width: 280px;
+        height: 100vh;
+        background: var(--white);
+        flex-direction: column;
+        gap: 0;
+        padding-top: 60px;
+        z-index: 1000;
+        transition: left 0.3s ease;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .main-nav.active {
+        left: 0;
+    }
+
+    .main-nav a {
+        padding: 15px 25px;
+        border-bottom: 1px solid #eee;
+        width: 100%;
+    }
+
+    /* Overlay */
+    .nav-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s;
+        backdrop-filter: blur(2px);
+    }
+
+    .nav-overlay.active {
+        display: block;
+        opacity: 1;
+    }
+
+    /* Search Form */
+    .hero-section {
+        height: auto;
+        padding: 80px 0;
+    }
+
+    .hero-content h1 {
+        font-size: 32px;
+    }
+
+    .search-form {
+        grid-template-columns: 1fr;
+        padding: 20px;
+    }
+
+    .btn-search {
+        grid-column: span 1;
+    }
+
+    /* Grids */
+    .property-types-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* Footer */
+    .footer-content {
+        grid-template-columns: 1fr;
+        text-align: center;
+    }
+}
+
+/* Toggle button default hidden */
+.nav-toggle {
+    display: none;
 }

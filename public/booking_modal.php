@@ -15,7 +15,18 @@
       </div>
       <div class="form-group">
         <label>Phone *</label>
-        <input type="tel" name="customer_phone" required placeholder="+91 12345 67890">
+        <div style="display: flex; gap: 10px;">
+          <select id="country_code"
+            style="width: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background:white;">
+            <option value="+91">+91</option>
+            <option value="+1">+1</option>
+            <option value="+44">+44</option>
+            <option value="+971">+971</option>
+          </select>
+          <input type="tel" id="details_phone" placeholder="10-digit number" maxlength="10"
+            oninput="this.value = this.value.replace(/[^0-9]/g, '')" style="flex: 1;">
+          <input type="hidden" name="customer_phone" id="full_phone">
+        </div>
       </div>
       <div class="form-group">
         <label>Identity Card (Optional)</label>
@@ -46,7 +57,8 @@
         <small>Upload screenshot or PDF of bank transfer receipt</small>
       </div>
       <div class="form-actions">
-        <button type="button" class="btn-cancel" onclick="document.getElementById('bookingModal').style.display='none'; document.body.style.overflow='auto';">Cancel</button>
+        <button type="button" class="btn-cancel"
+          onclick="document.getElementById('bookingModal').style.display='none'; document.body.style.overflow='auto';">Cancel</button>
         <button type="submit" class="btn-submit">Place Booking</button>
       </div>
     </form>

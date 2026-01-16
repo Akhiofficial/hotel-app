@@ -22,7 +22,7 @@ foreach ($allRooms as $room) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hotel reservation system - Book Your Perfect Stay</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=<?= time() ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
@@ -47,7 +47,10 @@ foreach ($allRooms as $room) {
     <header class="main-header">
         <div class="container">
             <div class="logo">Hotel reservation system</div>
-            <nav class="main-nav">
+            <button class="nav-toggle" id="navToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <nav class="main-nav" id="mainNav">
                 <a href="#" class="active">Home</a>
                 <a href="#rooms">Rooms</a>
                 <a href="check_bookings.php"><i class="fas fa-list-alt"></i> My Bookings</a>
@@ -56,6 +59,8 @@ foreach ($allRooms as $room) {
             </nav>
         </div>
     </header>
+
+    <div class="nav-overlay" id="navOverlay"></div>
 
     <!-- Hero Section -->
     <section class="hero-section">
@@ -283,51 +288,39 @@ foreach ($allRooms as $room) {
                 </div>
             </div>
             <div class="services-carousel">
-                <div class="service-card">
-                    <div class="service-image"
-                        style="background-image: url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600')">
+                <?php
+                // Fetch dynamic services
+                $services = $DB->query("SELECT * FROM services ORDER BY id DESC")->fetch_all(MYSQLI_ASSOC);
+
+                if (empty($services)):
+                    // Fallback/Default if no services found
+                    ?>
+                    <div class="service-card">
+                        <div class="service-image"
+                            style="background-image: url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600')">
+                        </div>
+                        <div class="service-overlay">
+                            <h3>Fitness Center</h3>
+                            <p>24/7 Gym Access</p>
+                        </div>
                     </div>
-                    <div class="service-overlay">
-                        <h3>Fitness Center</h3>
-                        <p>24/7 Gym Access</p>
-                    </div>
-                </div>
-                <div class="service-card">
-                    <div class="service-image"
-                        style="background-image: url('https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=600')">
-                    </div>
-                    <div class="service-overlay">
-                        <h3>Swimming Pool</h3>
-                        <p>Outdoor Pool & Spa</p>
-                    </div>
-                </div>
-                <div class="service-card">
-                    <div class="service-image"
-                        style="background-image: url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600')">
-                    </div>
-                    <div class="service-overlay">
-                        <h3>Restaurant</h3>
-                        <p>Fine Dining Experience</p>
-                    </div>
-                </div>
-                <div class="service-card">
-                    <div class="service-image"
-                        style="background-image: url('https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=600')">
-                    </div>
-                    <div class="service-overlay">
-                        <h3>Airport Transfer</h3>
-                        <p>Pick Up & Drop Service</p>
-                    </div>
-                </div>
-                <div class="service-card">
-                    <div class="service-image"
-                        style="background-image: url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600')">
-                    </div>
-                    <div class="service-overlay">
-                        <h3>Parking</h3>
-                        <p>Free Valet Parking</p>
-                    </div>
-                </div>
+                <?php else: ?>
+                    <?php foreach ($services as $svc):
+                        $svcImg = !empty($svc['image']) ? $svc['image'] : 'https://via.placeholder.com/600x400/20B2AA/ffffff?text=' . urlencode($svc['name']);
+                        // Helper to fix path if it's not a full URL
+                        if (strpos($svcImg, 'http') !== 0 && strpos($svcImg, 'uploads/') !== 0) {
+                            $svcImg = 'uploads/' . $svcImg;
+                        }
+                        ?>
+                        <div class="service-card">
+                            <div class="service-image" style="background-image: url('<?= esc($svcImg) ?>')"></div>
+                            <div class="service-overlay">
+                                <h3><?= esc($svc['name']) ?></h3>
+                                <p><?= esc($svc['description'] ?? '') ?></p>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </div>
         </div>
     </section>
@@ -347,7 +340,7 @@ foreach ($allRooms as $room) {
                     <p>Happy Guests</p>
                 </div>
                 <div class="stat-item">
-                    <h3>15+</h3>
+                    <h3>5+</h3>
                     <p>Years Experience</p>
                 </div>
                 <div class="stat-item">
