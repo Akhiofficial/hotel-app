@@ -51,7 +51,7 @@ A simple PHP/MySQL hotel reservation system with a public booking site and an ad
 
 ## Default Admin Credentials
 - Username: `admin`
-- Password: `admin123`
+- Password: `xxxxxxx`
 
 Credentials are seeded by `install.sql` and validated in the app (`admin/login.php`). You can change them by updating the `admins` table or the fallback values in `config.php`.
 
