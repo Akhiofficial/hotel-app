@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   description TEXT,
   price DECIMAL(10,2) NOT NULL DEFAULT 0,
   capacity INT DEFAULT 1,
+  quantity INT DEFAULT 1,
   status ENUM('active','inactive') DEFAULT 'active',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -23,6 +24,8 @@ CREATE TABLE IF NOT EXISTS rooms (
 CREATE TABLE IF NOT EXISTS services (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(200),
+  description TEXT,
+  image VARCHAR(255),
   price DECIMAL(10,2) DEFAULT 0,
   qty INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -41,7 +44,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   total DECIMAL(12,2),
   gst_rate DECIMAL(5,2) DEFAULT 18.00,
   gst_amount DECIMAL(12,2) DEFAULT 0,
-  status ENUM('pending','paid','confirmed','cancelled') DEFAULT 'pending',
+  status ENUM('pending','paid','confirmed','cancelled','archived') DEFAULT 'pending',
   payment_method ENUM('cash','bank_transfer','online') DEFAULT 'cash',
   bank_proof VARCHAR(255) DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -49,15 +52,15 @@ CREATE TABLE IF NOT EXISTS bookings (
 );
 
 -- sample room(s)
-INSERT INTO rooms (code,title,description,price,capacity) VALUES
-('R101','Standard Single','Simple single room',1200.00,1),
-('R201','Deluxe Double','Double bed, AC',2200.00,2),
-('R301','Suite','Big suite with seating',4500.00,4);
+INSERT INTO rooms (code,title,description,price,capacity,quantity) VALUES
+('R101','Standard Single','Simple single room',1200.00,1,5),
+('R201','Deluxe Double','Double bed, AC',2200.00,2,3),
+('R301','Suite','Big suite with seating',4500.00,4,1);
 
 -- sample services
-INSERT INTO services (name,price,qty) VALUES
-('Breakfast',150.00,100),
-('Airport Pickup',500.00,10);
+INSERT INTO services (name,price,qty,description) VALUES
+('Breakfast',150.00,100,'Delicious morning buffet'),
+('Airport Pickup',500.00,10,'Pick up from local airport');
 
 -- sample admin
 INSERT INTO admins (username, password_hash) VALUES

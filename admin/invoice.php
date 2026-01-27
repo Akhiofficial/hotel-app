@@ -2,11 +2,17 @@
 // admin/invoice.php
 session_start();
 require_once __DIR__ . '/../db.php';
-if(empty($_SESSION['admin'])){ header('Location: login.php'); exit; }
+if (empty($_SESSION['admin'])) {
+    header('Location: login.php');
+    exit;
+}
 
 $id = intval($_GET['id'] ?? 0);
 $b = $DB->query("SELECT b.*, r.title as room_title, r.code as room_code FROM bookings b LEFT JOIN rooms r ON r.id=b.room_id WHERE b.id=$id")->fetch_assoc();
-if(!$b){ echo "Booking not found"; exit; }
+if (!$b) {
+    echo "Booking not found";
+    exit;
+}
 
 $pdf = isset($_GET['pdf']) && $_GET['pdf'] == '1';
 $subtotal = $b['total'] - $b['gst_amount'];
@@ -15,11 +21,11 @@ $roomRate = ($b['nights'] > 0) ? ($subtotal / $b['nights']) : $subtotal;
 // Safe date displays with fallback
 $checkinDisplay = (!empty($b['checkin']) && $b['checkin'] !== '0000-00-00') ? date('M d, Y', strtotime($b['checkin'])) : 'N/A';
 $checkoutDisplay = '';
-if(!empty($b['checkout']) && $b['checkout'] !== '0000-00-00'){
+if (!empty($b['checkout']) && $b['checkout'] !== '0000-00-00') {
     $checkoutDisplay = date('M d, Y', strtotime($b['checkout']));
 } else {
-    if(!empty($b['checkin']) && !empty($b['nights']) && intval($b['nights']) >= 1){
-        $checkoutDisplay = date('M d, Y', strtotime('+'.intval($b['nights']).' day', strtotime($b['checkin'])));
+    if (!empty($b['checkin']) && !empty($b['nights']) && intval($b['nights']) >= 1) {
+        $checkoutDisplay = date('M d, Y', strtotime('+' . intval($b['nights']) . ' day', strtotime($b['checkin'])));
     } else {
         $checkoutDisplay = 'Not checked out';
     }
@@ -27,10 +33,13 @@ if(!empty($b['checkout']) && $b['checkout'] !== '0000-00-00'){
 
 // Build HTML conditionally - exclude buttons for PDF
 $actionButtons = '';
-if(!$pdf) {
+if (!$pdf) {
     $actionButtons = '
     <div class="invoice-actions">
-        <a href="?id='.$id.'&pdf=1" class="btn-pdf">
+        <a href="javascript:window.print()" class="btn-pdf" style="background: #2C3E50; margin-right: 10px;">
+            <i class="fas fa-print"></i> Print
+        </a>
+        <a href="?id=' . $id . '&pdf=1" class="btn-pdf">
             <i class="fas fa-file-pdf"></i> Download PDF
         </a>
         <a href="bookings.php" class="btn-pdf" style="background: #808080; margin-left: 10px;">
@@ -44,7 +53,7 @@ $invoice_html = '
 <html>
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <title>Bill #'.$b['id'].'</title>
+    <title>Bill #' . $b['id'] . '</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -229,32 +238,52 @@ $invoice_html = '
             line-height: 1.8; 
             font-size: 14px; 
         }
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .invoice-container {
+                box-shadow: none;
+                max-width: 100%;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                border: none;
+            }
+            .invoice-actions {
+                display: none !important;
+            }
+            .invoice-header {
+                margin-top: 0;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="invoice-container">
         <div class="invoice-header">
             <h1>BILL</h1>
-            <p>Bill #'.$b['id'].' | Date: '.date('F d, Y', strtotime($b['created_at'])).'</p>
+            <p>Bill #' . $b['id'] . ' | Date: ' . date('F d, Y', strtotime($b['created_at'])) . '</p>
         </div>
         
         <div class="invoice-info">
             <div class="info-block">
                 <h3>Hotel Information</h3>
                 <p>
-                    <strong>Hotel Reservation System</strong><br>
-                    City Center, Main Street<br>
+                    <strong>Bed N Basics</strong><br>
+                    Satav Chowk, Jatharpeth, Akola.<br>
                     Phone: +91 12345 67890<br>
                     Email: reservations@hotel.com<br>
-                    <strong>GSTIN:</strong> 29ABCDE1234F1Z5
+                    <strong>GSTIN:</strong> 27CNLPD2064H1Z2
                 </p>
             </div>
             <div class="info-block">
                 <h3>Bill To</h3>
                 <p>
-                    <strong>'.htmlspecialchars($b['customer_name'], ENT_QUOTES, 'UTF-8').'</strong><br>
-                    '.htmlspecialchars($b['customer_email'], ENT_QUOTES, 'UTF-8').'<br>
-                    '.htmlspecialchars($b['customer_phone'], ENT_QUOTES, 'UTF-8').'
+                    <strong>' . htmlspecialchars($b['customer_name'], ENT_QUOTES, 'UTF-8') . '</strong><br>
+                    ' . htmlspecialchars($b['customer_email'], ENT_QUOTES, 'UTF-8') . '<br>
+                    ' . htmlspecialchars($b['customer_phone'], ENT_QUOTES, 'UTF-8') . '
                 </p>
             </div>
         </div>
@@ -273,14 +302,14 @@ $invoice_html = '
             <tbody>
                 <tr>
                     <td>
-                        <strong>'.htmlspecialchars($b['room_title'] ?? 'N/A', ENT_QUOTES, 'UTF-8').'</strong><br>
-                        <small style="color: #808080;">Room Code: '.htmlspecialchars($b['room_code'] ?? 'N/A', ENT_QUOTES, 'UTF-8').'</small>
+                        <strong>' . htmlspecialchars($b['room_title'] ?? 'N/A', ENT_QUOTES, 'UTF-8') . '</strong><br>
+                        <small style="color: #808080;">Room Code: ' . htmlspecialchars($b['room_code'] ?? 'N/A', ENT_QUOTES, 'UTF-8') . '</small>
                     </td>
-                    <td class="text-right">'.$checkinDisplay.'</td>
-                    <td class="text-right">'.$checkoutDisplay.'</td>
-                    <td class="text-right">'.intval($b['nights']).'</td>
-                    <td class="text-right">Rs. '.number_format($roomRate, 2).'</td>
-                    <td class="text-right"><strong>Rs. '.number_format($subtotal, 2).'</strong></td>
+                    <td class="text-right">' . $checkinDisplay . '</td>
+                    <td class="text-right">' . $checkoutDisplay . '</td>
+                    <td class="text-right">' . intval($b['nights']) . '</td>
+                    <td class="text-right">Rs. ' . number_format($roomRate, 2) . '</td>
+                    <td class="text-right"><strong>Rs. ' . number_format($subtotal, 2) . '</strong></td>
                 </tr>
             </tbody>
         </table>
@@ -289,19 +318,19 @@ $invoice_html = '
             <h4>GST Breakdown</h4>
             <div class="gst-row">
                 <span>Subtotal (Before GST):</span>
-                <span><strong>Rs. '.number_format($subtotal, 2).'</strong></span>
+                <span><strong>Rs. ' . number_format($subtotal, 2) . '</strong></span>
             </div>
             <div class="gst-row">
                 <span>GST Rate:</span>
-                <span><strong>'.number_format($b['gst_rate'], 2).'%</strong></span>
+                <span><strong>' . number_format($b['gst_rate'], 2) . '%</strong></span>
             </div>
             <div class="gst-row">
                 <span>GST Amount:</span>
-                <span><strong>Rs. '.number_format($b['gst_amount'], 2).'</strong></span>
+                <span><strong>Rs. ' . number_format($b['gst_amount'], 2) . '</strong></span>
             </div>
             <div class="gst-row" style="border-top: 2px solid #1A4D2E; margin-top: 10px; padding-top: 15px;">
                 <span style="font-size: 18px; font-weight: bold; color: #1A4D2E;">Total Amount (Including GST):</span>
-                <span style="font-size: 20px; font-weight: bold; color: #1A4D2E;">Rs. '.number_format($b['total'], 2).'</span>
+                <span style="font-size: 20px; font-weight: bold; color: #1A4D2E;">Rs. ' . number_format($b['total'], 2) . '</span>
             </div>
         </div>
         
@@ -309,8 +338,8 @@ $invoice_html = '
             <tbody>
                 <tr>
                     <td colspan="6" style="border: none; padding-top: 20px;">
-                        <strong>Payment Method:</strong> '.ucfirst(str_replace('_', ' ', htmlspecialchars($b['payment_method'], ENT_QUOTES, 'UTF-8'))).'<br>
-                        <strong>Status:</strong> <span class="status-badge status-'.htmlspecialchars($b['status'], ENT_QUOTES, 'UTF-8').'">'.ucfirst(htmlspecialchars($b['status'], ENT_QUOTES, 'UTF-8')).'</span>
+                        <strong>Payment Method:</strong> ' . ucfirst(str_replace('_', ' ', htmlspecialchars($b['payment_method'], ENT_QUOTES, 'UTF-8'))) . '<br>
+                        <strong>Status:</strong> <span class="status-badge status-' . htmlspecialchars($b['status'], ENT_QUOTES, 'UTF-8') . '">' . ucfirst(htmlspecialchars($b['status'], ENT_QUOTES, 'UTF-8')) . '</span>
                     </td>
                 </tr>
             </tbody>
@@ -329,24 +358,24 @@ $invoice_html = '
             <p style="font-size: 12px; margin-top: 15px;">For any queries, please contact: reservations@hotel.com | +91 12345 67890</p>
         </div>
     </div>
-    '.$actionButtons.'
+    ' . $actionButtons . '
 </body>
 </html>';
 
-if($pdf){
+if ($pdf) {
     require_once __DIR__ . '/../vendor/autoload.php';
-    
+
     // Configure Dompdf options
     $options = new \Dompdf\Options();
     $options->set('isHtml5ParserEnabled', true);
     $options->set('isRemoteEnabled', false);
     $options->set('defaultFont', 'DejaVu Sans');
-    
+
     $dompdf = new \Dompdf\Dompdf($options);
     $dompdf->loadHtml($invoice_html, 'UTF-8');
     $dompdf->setPaper('A4', 'portrait');
     $dompdf->render();
-    
+
     // Output PDF
     $dompdf->stream("invoice-{$b['id']}.pdf", array("Attachment" => true));
     exit;
