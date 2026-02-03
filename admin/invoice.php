@@ -14,9 +14,126 @@ if (!$b) {
     exit;
 }
 
+// Handle Actions (Add/Delete Extra)
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    $action = $_POST['action'] ?? '';
+    $booking_id = intval($_POST['booking_id'] ?? 0);
+
+    if (!$booking_id) {
+        echo json_encode(['success' => false, 'message' => 'Invalid booking ID']);
+        exit;
+    }
+
+    if ($action === 'add_extra') {
+        $description = trim($_POST['description'] ?? '');
+        $amount = floatval($_POST['amount'] ?? 0);
+
+        if (empty($description) || $amount <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Invalid input']);
+            exit;
+        }
+
+        $DB->begin_transaction();
+        try {
+            $stmt = $DB->prepare("INSERT INTO booking_extras (booking_id, description, amount) VALUES (?, ?, ?)");
+            $stmt->bind_param("isd", $booking_id, $description, $amount);
+            $stmt->execute();
+
+            // Update booking total
+            $stmt2 = $DB->prepare("UPDATE bookings SET total = total + ? WHERE id = ?");
+            $stmt2->bind_param("di", $amount, $booking_id);
+            $stmt2->execute();
+
+            $DB->commit();
+            echo json_encode(['success' => true]);
+        } catch (Exception $e) {
+            $DB->rollback();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    } elseif ($action === 'delete_extra') {
+        $extra_id = intval($_POST['id'] ?? 0);
+
+        // Get amount first
+        $stmt = $DB->prepare("SELECT amount FROM booking_extras WHERE id = ? AND booking_id = ?");
+        $stmt->bind_param("ii", $extra_id, $booking_id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $extra = $res->fetch_assoc();
+
+        if ($extra) {
+            $amount = $extra['amount'];
+            $DB->begin_transaction();
+            try {
+                $DB->query("DELETE FROM booking_extras WHERE id=$extra_id");
+                $stmt2 = $DB->prepare("UPDATE bookings SET total = total - ? WHERE id = ?");
+                $stmt2->bind_param("di", $amount, $booking_id);
+                $stmt2->execute();
+                $DB->commit();
+                echo json_encode(['success' => true]);
+            } catch (Exception $e) {
+                $DB->rollback();
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            }
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Not found']);
+        }
+        exit;
+    }
+    exit;
+}
+
+$extras = [];
+$res = $DB->query("SELECT * FROM booking_extras WHERE booking_id = $id ORDER BY id ASC");
+if ($res) {
+    while ($row = $res->fetch_assoc()) {
+        $extras[] = $row;
+    }
+}
+
+$extras_rows = '';
+$modal_extras_rows = '';
+$extrasTotal = 0;
+
+if (!empty($extras)) {
+    foreach ($extras as $extra) {
+        $extrasTotal += $extra['amount'];
+        $desc = htmlspecialchars($extra['description'], ENT_QUOTES, 'UTF-8');
+        $amt = number_format($extra['amount'], 2);
+
+        // Invoice Table Row
+        $extras_rows .= '
+        <tr>
+            <td colspan="5">
+                <strong>' . $desc . '</strong>
+            </td>
+            <td class="text-right"><strong>Rs. ' . $amt . '</strong></td>
+        </tr>';
+
+        // Modal Table Row
+        $modal_extras_rows .= '
+        <tr>
+            <td>' . $desc . '</td>
+            <td class="text-right">Rs. ' . $amt . '</td>
+            <td class="text-right">
+                <button onclick="deleteExtra(' . $extra['id'] . ')" style="background: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Delete</button>
+            </td>
+        </tr>';
+    }
+} else {
+    $modal_extras_rows = '<tr><td colspan="3" style="text-align: center;">No extra charges</td></tr>';
+}
+
 $pdf = isset($_GET['pdf']) && $_GET['pdf'] == '1';
-$subtotal = $b['total'] - $b['gst_amount'];
-$roomRate = ($b['nights'] > 0) ? ($subtotal / $b['nights']) : $subtotal;
+
+// Calculate Room Totals separate from Extras
+// Total = Room + GST + Extras
+// GST is fixed in DB
+// Room = Total - Extras - GST
+$roomAmount = $b['total'] - $extrasTotal - $b['gst_amount'];
+$roomRate = ($b['nights'] > 0) ? ($roomAmount / $b['nights']) : $roomAmount;
+
 
 // Safe date displays with fallback
 $checkinDisplay = (!empty($b['checkin']) && $b['checkin'] !== '0000-00-00') ? date('M d, Y', strtotime($b['checkin'])) : 'N/A';
@@ -42,6 +159,9 @@ if (!$pdf) {
         <a href="?id=' . $id . '&pdf=1" class="btn-pdf">
             <i class="fas fa-file-pdf"></i> Download PDF
         </a>
+        <button onclick="document.getElementById(\'editModal\').style.display=\'block\'" class="btn-pdf" style="background: #e67e22; margin-left: 10px; border: none; cursor: pointer;">
+            <i class="fas fa-edit"></i> Edit Bill
+        </button>
         <a href="bookings.php" class="btn-pdf" style="background: #808080; margin-left: 10px;">
             <i class="fas fa-arrow-left"></i> Back to Bookings
         </a>
@@ -238,6 +358,42 @@ $invoice_html = '
             line-height: 1.8; 
             font-size: 14px; 
         }
+        
+        /* Modal styles */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgba(0,0,0,0.4); 
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto; 
+            padding: 20px;
+            border: 1px solid #888;
+            width: 60%; 
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
         @media print {
             body {
                 background: white;
@@ -309,16 +465,17 @@ $invoice_html = '
                     <td class="text-right">' . $checkoutDisplay . '</td>
                     <td class="text-right">' . intval($b['nights']) . '</td>
                     <td class="text-right">Rs. ' . number_format($roomRate, 2) . '</td>
-                    <td class="text-right"><strong>Rs. ' . number_format($subtotal, 2) . '</strong></td>
+                    <td class="text-right"><strong>Rs. ' . number_format($roomAmount, 2) . '</strong></td>
                 </tr>
+                ' . $extras_rows . '
             </tbody>
         </table>
         
         <div class="gst-breakdown">
             <h4>GST Breakdown</h4>
             <div class="gst-row">
-                <span>Subtotal (Before GST):</span>
-                <span><strong>Rs. ' . number_format($subtotal, 2) . '</strong></span>
+                <span>Room Charges:</span>
+                <span><strong>Rs. ' . number_format($roomAmount, 2) . '</strong></span>
             </div>
             <div class="gst-row">
                 <span>GST Rate:</span>
@@ -328,6 +485,11 @@ $invoice_html = '
                 <span>GST Amount:</span>
                 <span><strong>Rs. ' . number_format($b['gst_amount'], 2) . '</strong></span>
             </div>
+            ' . ($extrasTotal > 0 ? '
+            <div class="gst-row">
+                <span>Additional Charges (Food, Services, etc):</span>
+                <span><strong>Rs. ' . number_format($extrasTotal, 2) . '</strong></span>
+            </div>' : '') . '
             <div class="gst-row" style="border-top: 2px solid #1A4D2E; margin-top: 10px; padding-top: 15px;">
                 <span style="font-size: 18px; font-weight: bold; color: #1A4D2E;">Total Amount (Including GST):</span>
                 <span style="font-size: 20px; font-weight: bold; color: #1A4D2E;">Rs. ' . number_format($b['total'], 2) . '</span>
@@ -360,6 +522,98 @@ $invoice_html = '
     </div>
     ' . $actionButtons . '
 </body>
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="document.getElementById(\'editModal\').style.display=\'none\'">&times;</span>
+        <h2 style="color: #1A4D2E; margin-bottom: 20px;">Edit Bill</h2>
+        
+        <div class="add-extra-form" style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee;">
+            <h3 style="margin-bottom: 10px;">Add Extra Charge</h3>
+            <input type="text" id="extraDesc" placeholder="Description (e.g. Food Bill)" style="padding: 8px; width: 40%; margin-right: 10px; border: 1px solid #ddd; border-radius: 4px;">
+            <input type="number" id="extraAmount" placeholder="Amount" step="0.01" style="padding: 8px; width: 20%; margin-right: 10px; border: 1px solid #ddd; border-radius: 4px;">
+            <button onclick="addExtra()" class="btn-pdf" style="padding: 8px 20px; cursor: pointer;">Add</button>
+        </div>
+
+        <div class="current-extras">
+            <h3 style="margin-bottom: 10px;">Current Extras</h3>
+            <table style="margin: 0;">
+                <thead>
+                    <tr>
+                        <th>Description</th>
+                        <th class="text-right">Amount</th>
+                        <th class="text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="extrasList">
+                    ' . $modal_extras_rows . '
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function addExtra() {
+    const desc = document.getElementById(\'extraDesc\').value;
+    const amount = document.getElementById(\'extraAmount\').value;
+    
+    if (!desc || !amount) {
+        alert(\'Please fill in all fields\');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append(\'action\', \'add_extra\');
+    formData.append(\'booking_id\', ' . $id . ');
+    formData.append(\'description\', desc);
+    formData.append(\'amount\', amount);
+
+    fetch(\'invoice.php?id=' . $id . '\', {
+        method: \'POST\',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(\'Error: \' + data.message);
+        }
+    })
+    .catch(err => alert(\'Error connecting to server\'));
+}
+
+function deleteExtra(id) {
+    if (!confirm(\'Are you sure?\')) return;
+
+    const formData = new FormData();
+    formData.append(\'action\', \'delete_extra\');
+    formData.append(\'booking_id\', ' . $id . ');
+    formData.append(\'id\', id);
+
+    fetch(\'invoice.php?id=' . $id . '\', {
+        method: \'POST\',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(\'Error: \' + data.message);
+        }
+    })
+    .catch(err => alert(\'Error connecting to server\'));
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById(\'editModal\');
+    if (event.target == modal) {
+        modal.style.display = "none";
+    }
+}
+</script>
 </html>';
 
 if ($pdf) {

@@ -105,7 +105,8 @@ if ($action === 'create_booking') {
         }
 
         // Validate email
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        // Validate email (optional)
+        if (!empty($email) && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             if ($isAjax) {
                 sendError('Invalid email address');
             } else {

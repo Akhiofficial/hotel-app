@@ -29,7 +29,7 @@ $rooms = $DB->query("SELECT r.*,
                      WHERE r.status='active' 
                      ORDER BY r.code")->fetch_all(MYSQLI_ASSOC);
 
-$recentBookings = $DB->query("SELECT b.*, r.title as room_title FROM bookings b LEFT JOIN rooms r ON r.id=b.room_id ORDER BY b.created_at DESC LIMIT 10")->fetch_all(MYSQLI_ASSOC);
+$recentBookings = $DB->query("SELECT b.*, r.title as room_title FROM bookings b LEFT JOIN rooms r ON r.id=b.room_id WHERE b.status != 'archived' ORDER BY b.created_at DESC LIMIT 10")->fetch_all(MYSQLI_ASSOC);
 
 function safeDateDisplay($date)
 {
@@ -146,7 +146,8 @@ function displayCheckout($checkin, $checkout, $nights)
                                     foreach ($allRooms as $room):
                                         ?>
                                         <option value="<?= esc($room['id']) ?>"><?= esc($room['code']) ?> -
-                                            <?= esc($room['title']) ?></option>
+                                            <?= esc($room['title']) ?>
+                                        </option>
                                     <?php endforeach; ?>
                                 </select>
                                 <button class="btn-primary" onclick="openBookingModal()">
@@ -326,6 +327,10 @@ function displayCheckout($checkin, $checkout, $nights)
                                                     title="View Details">
                                                     <i class="fas fa-eye"></i>
                                                 </a>
+                                                <button class="btn-icon btn-danger" onclick="deleteBooking(<?= esc($b['id']) ?>)"
+                                                    title="Delete">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -340,7 +345,7 @@ function displayCheckout($checkin, $checkout, $nights)
 
     <!-- Load scripts at the bottom, in correct order -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="admin-scripts.js?v=<?=time()?>"></script>
+    <script src="admin-scripts.js?v=<?= time() ?>"></script>
 
     <!-- Load FullCalendar with proper callback -->
     <script>
@@ -651,6 +656,23 @@ function displayCheckout($checkin, $checkout, $nights)
                         location.reload();
                     } else {
                         alert('Error: ' + (data.msg || 'Failed to update'));
+                    }
+                });
+        }
+
+        function deleteBooking(id) {
+            if (!confirm('Are you sure you want to delete this booking permanently? This cannot be undone.')) return;
+            fetch('api.php?action=delete_booking', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'id=' + id
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + (data.msg || 'Failed to delete'));
                     }
                 });
         }

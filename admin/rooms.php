@@ -168,8 +168,8 @@ unset($room); // Break reference
             <script src="admin-scripts.js?v=<?= time() ?>"></script>
 
             <?php if (isset($_GET['success'])): ?>
-                <div class="alert alert-success">Room saved successfully!</div>
-                <script>if (window.CapacityUpdates) { window.CapacityUpdates.emit(); }</script>
+                    <div class="alert alert-success">Room saved successfully!</div>
+                    <script>if (window.CapacityUpdates) { window.CapacityUpdates.emit(); }</script>
             <?php endif; ?>
 
             <!-- Room Form -->
@@ -221,8 +221,8 @@ unset($room); // Break reference
                                 <label>Room Image</label>
                                 <input type="file" name="image" accept="image/*">
                                 <?php if (!empty($editRoom['image'])): ?>
-                                    <small>Current: <a href="../public/<?= esc($editRoom['image']) ?>" target="_blank">View
-                                            Image</a></small>
+                                        <small>Current: <a href="../public/<?= esc($editRoom['image']) ?>" target="_blank">View
+                                                Image</a></small>
                                 <?php endif; ?>
                             </div>
                             <div class="form-group full-width">
@@ -237,7 +237,7 @@ unset($room); // Break reference
                                 <i class="fas fa-save"></i> Save Room
                             </button>
                             <?php if ($editRoom): ?>
-                                <a href="rooms.php" class="btn-secondary">Cancel</a>
+                                    <a href="rooms.php" class="btn-secondary">Cancel</a>
                             <?php endif; ?>
                         </div>
                     </form>
@@ -268,73 +268,73 @@ unset($room); // Break reference
                             </thead>
                             <tbody>
                                 <?php if (empty($rooms)): ?>
-                                    <tr>
-                                        <td colspan="10" class="text-center">No rooms found</td>
-                                    </tr>
-                                <?php else: ?>
-                                    <?php foreach ($rooms as $r): ?>
-                                        <tr
-                                            class="<?= $r['is_fully_occupied'] ? 'room-occupied' : ($r['is_available'] ? 'room-available' : '') ?>">
-                                            <td><?= esc($r['id']) ?></td>
-                                            <td>
-                                                <?php if (!empty($r['image'])): ?>
-                                                    <img src="../public/<?= esc($r['image']) ?>" alt="Room"
-                                                        style="width:60px;height:60px;object-fit:cover;border-radius:4px;">
-                                                <?php else: ?>
-                                                    <div
-                                                        style="width:60px;height:60px;background:#ddd;border-radius:4px;display:flex;align-items:center;justify-content:center;">
-                                                        <i class="fas fa-image"></i>
-                                                    </div>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td><strong><?= esc($r['code']) ?></strong></td>
-                                            <td><?= esc($r['title']) ?></td>
-                                            <td>₹<?= number_format($r['price'], 2) ?></td>
-                                            <td><?= esc($r['capacity']) ?> Guest<?= esc($r['capacity']) > 1 ? 's' : '' ?></td>
-                                            <td>
-                                                <strong><?= esc($r['quantity'] ?? 1) ?></strong>
-                                                Room<?= esc($r['quantity'] ?? 1) > 1 ? 's' : '' ?>
-                                            </td>
-                                            <td>
-                                                <?php if ($r['is_fully_occupied']): ?>
-                                                    <span class="occupancy-badge occupancy-booked" title="All rooms booked">
-                                                        <i class="fas fa-bed"></i> Booked
-                                                        (<?= $r['occupied_count'] ?>/<?= $r['quantity'] ?? 1 ?>)
-                                                    </span>
-                                                <?php elseif ($r['is_available']): ?>
-                                                    <span class="occupancy-badge occupancy-available" title="Available rooms">
-                                                        <i class="fas fa-check-circle"></i> Available
-                                                        (<?= $r['available_count'] ?>/<?= $r['quantity'] ?? 1 ?>)
-                                                    </span>
-                                                <?php else: ?>
-                                                    <span class="occupancy-badge occupancy-inactive" title="Inactive">
-                                                        <i class="fas fa-ban"></i> Inactive
-                                                    </span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td>
-                                                <span class="status-badge status-<?= esc($r['status']) ?>">
-                                                    <?= ucfirst(esc($r['status'])) ?>
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <div class="action-buttons">
-                                                    <a href="?edit=<?= esc($r['id']) ?>" class="btn-icon btn-primary"
-                                                        title="Edit">
-                                                        <i class="fas fa-edit"></i>
-                                                    </a>
-                                                    <form method="post" style="display:inline;"
-                                                        onsubmit="return confirm('Delete this room?')">
-                                                        <input type="hidden" name="action" value="delete">
-                                                        <input type="hidden" name="id" value="<?= esc($r['id']) ?>">
-                                                        <button type="submit" class="btn-icon btn-danger" title="Delete">
-                                                            <i class="fas fa-trash"></i>
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            </td>
+                                        <tr>
+                                            <td colspan="10" class="text-center">No rooms found</td>
                                         </tr>
-                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                        <?php foreach ($rooms as $r): ?>
+                                                <tr
+                                                    class="<?= $r['is_fully_occupied'] ? 'room-occupied' : ($r['is_available'] ? 'room-available' : '') ?>">
+                                                    <td><?= esc($r['id']) ?></td>
+                                                    <td>
+                                                        <?php if (!empty($r['image'])): ?>
+                                                                <img src="../public/<?= esc($r['image']) ?>" alt="Room"
+                                                                    style="width:60px;height:60px;object-fit:cover;border-radius:4px;">
+                                                        <?php else: ?>
+                                                                <div
+                                                                    style="width:60px;height:60px;background:#ddd;border-radius:4px;display:flex;align-items:center;justify-content:center;">
+                                                                    <i class="fas fa-image"></i>
+                                                                </div>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td><strong><?= esc($r['code']) ?></strong></td>
+                                                    <td><?= esc($r['title']) ?></td>
+                                                    <td>₹<?= number_format($r['price'], 2) ?></td>
+                                                    <td><?= esc($r['capacity']) ?> Guest<?= esc($r['capacity']) > 1 ? 's' : '' ?></td>
+                                                    <td>
+                                                        <strong><?= esc($r['quantity'] ?? 1) ?></strong>
+                                                        Room<?= esc($r['quantity'] ?? 1) > 1 ? 's' : '' ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($r['is_fully_occupied']): ?>
+                                                                <span class="occupancy-badge occupancy-booked" title="All rooms booked">
+                                                                    <i class="fas fa-bed"></i> Booked
+                                                                    (<?= $r['occupied_count'] ?>/<?= $r['quantity'] ?? 1 ?>)
+                                                                </span>
+                                                        <?php elseif ($r['is_available']): ?>
+                                                                <span class="occupancy-badge occupancy-available" title="Available rooms">
+                                                                    <i class="fas fa-check-circle"></i> Available
+                                                                    (<?= $r['available_count'] ?>/<?= $r['quantity'] ?? 1 ?>)
+                                                                </span>
+                                                        <?php else: ?>
+                                                                <span class="occupancy-badge occupancy-inactive" title="Inactive">
+                                                                    <i class="fas fa-ban"></i> Inactive
+                                                                </span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <span class="status-badge status-<?= esc($r['status']) ?>">
+                                                            <?= ucfirst(esc($r['status'])) ?>
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="action-buttons">
+                                                            <a href="?edit=<?= esc($r['id']) ?>" class="btn-icon btn-primary"
+                                                                title="Edit">
+                                                                <i class="fas fa-edit"></i>
+                                                            </a>
+                                                            <form method="post" style="display:inline;"
+                                                                onsubmit="return confirm('Delete this room?')">
+                                                                <input type="hidden" name="action" value="delete">
+                                                                <input type="hidden" name="id" value="<?= esc($r['id']) ?>">
+                                                                <button type="submit" class="btn-icon btn-danger" title="Delete">
+                                                                    <i class="fas fa-trash"></i>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                        <?php endforeach; ?>
                                 <?php endif; ?>
                             </tbody>
                         </table>

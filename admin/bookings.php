@@ -154,7 +154,9 @@ function displayCheckout($checkin, $checkout, $nights)
                                     <td><strong>#<?= esc($b['id']) ?></strong></td>
                                     <td>
                                         <strong><?= esc($b['customer_name']) ?></strong><br>
-                                        <small><i class="fas fa-envelope"></i> <?= esc($b['customer_email']) ?></small><br>
+                                        <?php if (!empty($b['customer_email'])): ?>
+                                            <small><i class="fas fa-envelope"></i> <?= esc($b['customer_email']) ?></small><br>
+                                        <?php endif; ?>
                                         <small><i class="fas fa-phone"></i> <?= esc($b['customer_phone']) ?></small>
                                     </td>
                                     <td>

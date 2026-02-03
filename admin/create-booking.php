@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Validate
-    if (empty($room_id) || empty($name) || empty($email) || empty($phone) || empty($checkin) || empty($checkout)) {
+    if (empty($room_id) || empty($name) || empty($phone) || empty($checkin) || empty($checkout)) {
         $error = "All fields are required";
     } else {
         // Validate dates are valid using DateTime
@@ -243,14 +243,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="form-group">
                             <label>Check-in Date *</label>
                             <input type="date" name="checkin" id="checkin" required value="<?= $selectedDate ?>"
-                                min="<?= date('Y-m-d') ?>" onchange="updateCheckoutMin(); calculateTotal();">
+                                min="<?= date('Y-m-d') ?>"
+                                onchange="updateCheckoutMin(); calculateTotal(); fetchAvailableRooms();">
                         </div>
 
                         <div class="form-group">
                             <label>Check-out Date *</label>
                             <input type="date" name="checkout" id="checkout" required
                                 min="<?= date('Y-m-d', strtotime('+1 day')) ?>"
-                                onchange="calculateTotal(); checkAvailability();">
+                                onchange="calculateTotal(); fetchAvailableRooms();">
                         </div>
 
                         <div class="form-group">
@@ -259,8 +260,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                         <div class="form-group">
-                            <label>Customer Email *</label>
-                            <input type="email" name="customer_email" required placeholder="customer@example.com">
+                            <label>Customer Email</label>
+                            <input type="email" name="customer_email" placeholder="customer@example.com">
                         </div>
 
                         <div class="form-group">
@@ -383,29 +384,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         function checkAvailability() {
+            // This function is now redundant for the dropdown, but useful for final check
+            // Kept for backward compatibility if needed, or we can integrate logic into fetchAvailableRooms
             const roomId = document.getElementById('room_id').value;
+            // ... existing logic can stay or be ignored ...
+            // We will rely on fetchAvailableRooms to disable invalid options
+        }
+
+        function fetchAvailableRooms() {
             const checkin = document.getElementById('checkin').value;
             const checkout = document.getElementById('checkout').value;
+            const roomSelect = document.getElementById('room_id');
             const statusDiv = document.getElementById('availabilityStatus');
 
-            if (!roomId || !checkin || !checkout) {
-                statusDiv.innerHTML = '';
-                return;
-            }
+            if (!checkin || !checkout) return;
 
-            statusDiv.innerHTML = '<div style="padding: 10px; background: #FFF3CD; border-radius: 6px;"><i class="fas fa-spinner fa-spin"></i> Checking availability...</div>';
+            // Visual feedback
+            const originalText = roomSelect.options[0].text;
+            roomSelect.options[0].text = "Checking availability...";
 
-            fetch(`api.php?action=check_availability&room_id=${roomId}&checkin=${checkin}&checkout=${checkout}`)
+            fetch(`api.php?action=availability_status&checkin=${checkin}&checkout=${checkout}`)
                 .then(r => r.json())
                 .then(data => {
-                    if (data.available) {
-                        statusDiv.innerHTML = '<div style="padding: 10px; background: #D4EDDA; color: #155724; border-radius: 6px;"><i class="fas fa-check-circle"></i> Room is available for selected dates</div>';
-                    } else {
-                        statusDiv.innerHTML = '<div style="padding: 10px; background: #F8D7DA; color: #721C24; border-radius: 6px;"><i class="fas fa-times-circle"></i> Room is not available for selected dates</div>';
+                    roomSelect.options[0].text = "Select Room"; // Restore default text
+
+                    if (data.rooms) {
+                        // Reset availability status message
+                        statusDiv.innerHTML = '';
+
+                        data.rooms.forEach(room => {
+                            // Find option by value (room_id)
+                            for (let i = 0; i < roomSelect.options.length; i++) {
+                                let opt = roomSelect.options[i];
+                                if (opt.value == room.room_id) {
+                                    // Update text and disabled state
+                                    const price = parseFloat(opt.getAttribute('data-price')).toFixed(2);
+                                    opt.text = `${room.code} - ${room.title} (₹${price}/night) - ${room.available} available`;
+
+                                    if (room.available <= 0) {
+                                        opt.disabled = true;
+                                        opt.style.color = '#dc3545'; // Red color for unavailable
+
+                                        // If this unavailable room was selected, deselect it
+                                        if (roomSelect.value == room.room_id) {
+                                            roomSelect.value = "";
+                                            calculateTotal(); // Reset summary
+                                            alert(`Room ${room.code} is not available for the selected dates. Please choose another.`);
+                                        }
+                                    } else {
+                                        opt.disabled = false;
+                                        opt.style.color = ''; // Reset color
+                                    }
+                                }
+                            }
+                        });
                     }
-                })
-                .catch(error => {
-                    statusDiv.innerHTML = '<div style="padding: 10px; background: #F8D7DA; color: #721C24; border-radius: 6px;">Error checking availability</div>';
                 });
         }
 
