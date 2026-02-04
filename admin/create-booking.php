@@ -121,7 +121,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $room = $DB->query("SELECT * FROM rooms WHERE id=$room_id")->fetch_assoc();
                         $room_price = floatval($room['price']);
                         $subtotal = $room_price * $nights;
+                        // GST Logic Update (Effective Sept 22, 2025)
                         $gst = floatval($config['default_gst']);
+                        if ($checkin >= '2025-09-22') {
+                            $gst = ($room_price > 7500) ? 18.00 : 5.00;
+                        }
                         $gst_amount = round($subtotal * $gst / 100, 2);
                         $total = round($subtotal + $gst_amount, 2);
 
@@ -314,7 +318,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <span id="subtotal">₹0.00</span>
                         </div>
                         <div class="summary-row">
-                            <span>GST (<?= $config['default_gst'] ?>%):</span>
+                            <span>GST <span id="gstLabel">(<?= $config['default_gst'] ?>%)</span>:</span>
                             <span id="gstAmount">₹0.00</span>
                         </div>
                         <div class="summary-row total-row">
@@ -370,7 +374,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             const subtotal = roomPrice * nights;
-            const gstRate = <?= $config['default_gst'] ?>;
+            let gstRate = <?= $config['default_gst'] ?>;
+            if (checkin >= '2025-09-22') {
+                gstRate = (roomPrice > 7500) ? 18.00 : 5.00;
+            }
+            
+            document.getElementById('gstLabel').textContent = '(' + gstRate + '%)';
             const gstAmount = (subtotal * gstRate) / 100;
             const total = subtotal + gstAmount;
 

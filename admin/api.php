@@ -143,7 +143,11 @@ if ($action === 'create_booking') {
 
         $room_price = floatval($room['price']);
         $subtotal = $room_price * $nights;
-        $gst = floatval($config['default_gst']);
+        // GST Logic Update (Effective Sept 22, 2025)
+        $gst = floatval($config['default_gst']); // Default fallback
+        if ($checkin >= '2025-09-22') {
+            $gst = ($room_price > 7500) ? 18.00 : 5.00;
+        }
         $gst_amount = round($subtotal * $gst / 100, 2);
         $total = round($subtotal + $gst_amount, 2);
 
