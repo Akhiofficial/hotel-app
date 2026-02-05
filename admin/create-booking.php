@@ -137,6 +137,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if (empty($checkout)) {
                             $error = "Check-out date is required";
                         } else {
+                            // Default status to paid so it shows in glance view immediately
+                            $status = 'paid';
+
                             // Insert booking with or without identity card
                             if ($has_identity_column) {
                                 $stmt = $DB->prepare("INSERT INTO bookings (room_id,customer_name,customer_email,customer_phone,checkin,checkout,nights,total,gst_rate,gst_amount,status,payment_method,identity_card) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
@@ -238,7 +241,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         data-quantity="<?= esc($room['quantity'] ?? 1) ?>">
                                         <?= esc($room['code']) ?> - <?= esc($room['title']) ?>
                                         (₹<?= number_format($room['price'], 2) ?>/night)
-                                        - <?= $available_qty ?> available
                                     </option>
                                 <?php endforeach; ?>
                             </select>

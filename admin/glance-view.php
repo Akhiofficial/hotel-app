@@ -10,20 +10,18 @@ if (empty($_SESSION['admin'])) {
 $today = date('Y-m-d');
 
 // Get all active rooms with occupancy status
-// IMPORTANT: Count ALL confirmed/paid bookings (past, present, and future) to calculate availability
-// This ensures that reserved rooms are not shown as available
+// IMPORTANT: Count active bookings for CURRENT date availability
 $rooms = $DB->query("SELECT r.*, 
                      (SELECT COUNT(*) FROM bookings b 
                       WHERE b.room_id = r.id 
-                      AND b.status IN ('confirmed', 'paid')
+                      AND b.status IN ('confirmed', 'paid', 'pending')
                       AND b.checkin IS NOT NULL 
                       AND b.checkin <> '0000-00-00'
-                      -- Count all confirmed/paid bookings regardless of date
-                      -- This includes past, current, and future bookings
+                      -- count confirmed bookings is less relevant for availability now, but kept for stats if needed
                       ) as total_confirmed_bookings,
                      (SELECT COUNT(*) FROM bookings b 
                       WHERE b.room_id = r.id 
-                      AND b.status IN ('confirmed', 'paid')
+                      AND b.status IN ('confirmed', 'paid', 'pending')
                       AND b.checkin IS NOT NULL 
                       AND b.checkin <> '0000-00-00'
                       AND (
@@ -44,13 +42,13 @@ $rooms = $DB->query("SELECT r.*,
 // Enhance rooms with booking details
 foreach ($rooms as &$room) {
     $total_quantity = intval($room['quantity'] ?? 1);
-    // Use total_confirmed_bookings for availability calculation (includes future bookings)
-    $total_confirmed = intval($room['total_confirmed_bookings'] ?? 0);
     // Use currently_occupied_count to determine if room is currently occupied (for display)
     $currently_occupied = intval($room['currently_occupied_count'] ?? 0);
 
-    // Available count = total quantity - all confirmed/paid bookings (including future)
-    $room['available_count'] = max(0, $total_quantity - $total_confirmed);
+    // Available count = total quantity - currently occupied bookings
+    // FIXED: Was previously subtracting ALL confirmed bookings (past/future)
+    $room['available_count'] = max(0, $total_quantity - $currently_occupied);
+
     // Room is "occupied" if currently active booking exists OR if available_count is 0 (fully booked)
     $room['is_occupied'] = ($currently_occupied > 0 || $room['available_count'] <= 0);
     $room['is_fully_occupied'] = ($room['available_count'] <= 0 && $total_quantity > 0);
@@ -130,9 +128,11 @@ unset($room);
 
 // Separate occupied and available rooms
 $occupiedRooms = array_filter($rooms, function ($r) {
-    return $r['is_occupied']; });
+    return $r['is_occupied'];
+});
 $availableRooms = array_filter($rooms, function ($r) {
-    return !$r['is_occupied']; });
+    return !$r['is_occupied'];
+});
 
 // Debug mode - set to true to see booking details
 $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
@@ -229,14 +229,10 @@ $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
                         <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 4px;">
                             <strong><?= esc($room['code']) ?> - <?= esc($room['title']) ?></strong><br>
                             <small>
-                                Total Quantity: <?= $room['quantity'] ?? 1 ?> |
                                 Total Confirmed Bookings: <strong
                                     style="color: #28a745;"><?= $room['total_confirmed_bookings'] ?? 0 ?></strong> |
                                 Currently Occupied: <strong
                                     style="color: <?= $room['currently_occupied_count'] > 0 ? '#dc3545' : '#28a745' ?>"><?= $room['currently_occupied_count'] ?? 0 ?></strong>
-                                |
-                                Available: <strong
-                                    style="color: <?= $room['available_count'] > 0 ? '#28a745' : '#dc3545' ?>"><?= $room['available_count'] ?></strong>
                             </small>
                             <?php if (!empty($room['debug_bookings'])): ?>
                                 <div style="margin-top: 8px;">
@@ -301,7 +297,8 @@ $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
                     <i class="fas fa-th"></i> All Rooms (<span id="allCount"><?= count($rooms) ?></span>)
                 </button>
                 <button class="glance-tab" data-filter="occupied" onclick="filterRooms('occupied')">
-                    <i class="fas fa-bed"></i> Occupied (<span id="occupiedTabCount"><?= count($occupiedRooms) ?></span>)
+                    <i class="fas fa-bed"></i> Occupied (<span
+                        id="occupiedTabCount"><?= count($occupiedRooms) ?></span>)
                 </button>
                 <button class="glance-tab" data-filter="available" onclick="filterRooms('available')">
                     <i class="fas fa-check-circle"></i> Available (<span
@@ -340,8 +337,8 @@ $debug_mode = isset($_GET['debug']) && $_GET['debug'] == '1';
                             <div class="glance-detail-row">
                                 <i class="fas fa-bed"></i>
                                 <span>
-                                    <strong>Available:</strong>
-                                    <?= esc($room['available_count']) ?> / <?= esc($room['quantity'] ?? 1) ?> rooms
+                                    <strong>Status:</strong>
+                                    <?= $room['is_occupied'] ? 'Occupied' : 'Available' ?>
                                 </span>
                             </div>
                             <div class="glance-detail-row">
