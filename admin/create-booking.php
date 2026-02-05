@@ -124,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         // GST Logic Update (Effective Sept 22, 2025)
                         $gst = floatval($config['default_gst']);
                         if ($checkin >= '2025-09-22') {
-                            $gst = ($room_price > 7500) ? 18.00 : 5.00;
+                            $gst = 5.00;
                         }
                         $gst_amount = round($subtotal * $gst / 100, 2);
                         $total = round($subtotal + $gst_amount, 2);
@@ -376,9 +376,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const subtotal = roomPrice * nights;
             let gstRate = <?= $config['default_gst'] ?>;
             if (checkin >= '2025-09-22') {
-                gstRate = (roomPrice > 7500) ? 18.00 : 5.00;
+                gstRate = 5.00;
             }
-            
+
             document.getElementById('gstLabel').textContent = '(' + gstRate + '%)';
             const gstAmount = (subtotal * gstRate) / 100;
             const total = subtotal + gstAmount;

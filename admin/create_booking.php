@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // GST Logic Update (Effective Sept 22, 2025)
                     $gst = floatval($config['default_gst']);
                     if ($checkin >= '2025-09-22') {
-                        $gst = ($room_price > 7500) ? 18.00 : 5.00;
+                        $gst = 5.00;
                     }
                     $gst_amount = round($subtotal * $gst / 100, 2);
                     $total = round($subtotal + $gst_amount, 2);
@@ -207,7 +207,7 @@ $rooms = $DB->query("SELECT * FROM rooms WHERE status='active' ORDER BY code")->
                                 <span id="subtotal">₹0.00</span>
                             </div>
                             <div class="summary-row">
-                                <span>GST <span id="gstLabel">(<?=$config['default_gst']?>%)</span>:</span>
+                                <span>GST <span id="gstLabel">(<?= $config['default_gst'] ?>%)</span>:</span>
                                 <span id="gstAmount">₹0.00</span>
                             </div>
                             <div class="summary-row total-row">
@@ -252,11 +252,11 @@ $rooms = $DB->query("SELECT * FROM rooms WHERE status='active' ORDER BY code")->
             }
 
             const subtotal = roomPrice * nights;
-            let gstRate = <?=$config['default_gst']?>;
+            let gstRate = <?= $config['default_gst'] ?>;
             // Convert checkin date string to a comparable format (YYYY-MM-DD)
             const checkinDateStr = checkin; // checkin is already YYYY-MM-DD
             if (checkinDateStr >= '2025-09-22') {
-                gstRate = (roomPrice > 7500) ? 18.00 : 5.00;
+                gstRate = 5.00;
             }
 
             document.getElementById('gstLabel').textContent = '(' + gstRate + '%)';
