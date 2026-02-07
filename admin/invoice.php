@@ -168,13 +168,7 @@ if (!$pdf) {
     </div>';
 }
 
-$invoice_html = '
-<!DOCTYPE html>
-<html>
-<head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <title>Bill #' . $b['id'] . '</title>
-    <style>
+$web_css = '
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: DejaVu Sans, Arial, Helvetica, sans-serif; 
@@ -203,14 +197,12 @@ $invoice_html = '
             color: #808080; 
             font-size: 14px; 
         }
-        .invoice-info { 
-            display: table; 
+        .invoice-info-table { 
             width: 100%; 
             margin-bottom: 40px; 
         }
         .info-block { 
-            display: table-cell; 
-            width: 50%; 
+            width: 100%; 
             padding-right: 20px; 
             vertical-align: top; 
         }
@@ -266,21 +258,6 @@ $invoice_html = '
             margin-bottom: 15px; 
             font-size: 16px; 
             font-weight: bold; 
-        }
-        .gst-row { 
-            display: table; 
-            width: 100%; 
-            padding: 8px 0; 
-            border-bottom: 1px solid #E0E0E0; 
-        }
-        .gst-row span { 
-            display: table-cell; 
-        }
-        .gst-row span:last-child { 
-            text-align: right; 
-        }
-        .gst-row:last-child { 
-            border-bottom: none; 
         }
         .total-row { 
             background: #1A4D2E; 
@@ -394,10 +371,16 @@ $invoice_html = '
             cursor: pointer;
         }
 
+        /* Print Styles */
         @media print {
+            @page {
+                size: A4;
+                margin: 5mm;
+            }
             body {
                 background: white;
                 padding: 0;
+                font-size: 11px;
             }
             .invoice-container {
                 box-shadow: none;
@@ -407,42 +390,284 @@ $invoice_html = '
                 padding: 0;
                 border: none;
             }
-            .invoice-actions {
+            .invoice-actions, .modal {
                 display: none !important;
             }
             .invoice-header {
-                margin-top: 0;
+                padding-bottom: 5px;
+                margin-bottom: 10px;
+                border-bottom: 2px solid #1A4D2E;
             }
+            .invoice-header h1 {
+                font-size: 20px;
+                margin: 0;
+            }
+            .invoice-header p {
+                font-size: 10px;
+                margin: 2px 0 0 0;
+            }
+            .invoice-info-table {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+            .info-block {
+                width: 100%;
+            }
+            .info-block h3 {
+                font-size: 12px;
+                margin-bottom: 3px;
+                padding-bottom: 2px;
+                border-bottom-width: 1px;
+            }
+            .info-block p {
+                font-size: 10px;
+                line-height: 1.2;
+            }
+            table {
+                margin: 10px 0;
+                width: 100%;
+                border-collapse: separate; 
+                border-spacing: 0;
+            }
+            th {
+                padding: 4px;
+                font-size: 10px;
+                background-color: #eee !important;
+                color: #000 !important;
+                border-bottom: 1px solid #000;
+                text-align: left;
+            }
+            td {
+                padding: 4px;
+                font-size: 10px;
+                border-bottom: 1px solid #ddd;
+            }
+            .text-right {
+                text-align: right;
+            }
+            .gst-breakdown {
+                padding: 5px;
+                margin: 10px 0 0 0;
+                background: none;
+                border: 1px solid #eee;
+            }
+            .gst-breakdown h4 {
+                font-size: 12px;
+                margin-bottom: 5px;
+            }
+            .total-row td {
+                padding: 5px;
+                font-size: 12px;
+                background: #eee !important;
+                color: #000 !important;
+            }
+            .payment-terms-box {
+                margin-top: 10px;
+                padding: 5px;
+                font-size: 9px;
+                border: 1px solid #ddd;
+                border-left-width: 2px;
+            }
+            .invoice-footer {
+                margin-top: 10px;
+                padding-top: 5px;
+                border-top: 1px solid #ddd;
+            }
+            .invoice-footer p {
+                font-size: 9px;
+                margin: 2px 0;
+            }
+            h1, h2, h3, h4, h5, h6 { margin-top: 0; }
+            p { margin-bottom: 0; }
         }
+';
+
+$pdf_css = '
+        body { 
+            background: white; 
+            font-size: 10px; 
+            font-family: DejaVu Sans, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .invoice-container { 
+            width: 100%; 
+            margin: 0; 
+            padding: 0; 
+            border: none; 
+        }
+        .invoice-header { 
+            padding-bottom: 5px; 
+            margin-bottom: 15px; 
+            border-bottom: 2px solid #1A4D2E; 
+        }
+        .invoice-header h1 { 
+            font-size: 20px; 
+            margin: 0; 
+            color: #1A4D2E; 
+        }
+        .invoice-header p { 
+            font-size: 10px; 
+            color: #808080; 
+            margin: 2px 0 0 0; 
+        }
+        .invoice-info-table { 
+            width: 100%; 
+            margin-bottom: 15px; 
+            border-spacing: 0;
+            border-collapse: collapse;
+            page-break-inside: avoid;
+        }
+        .info-block { 
+            width: 100%; 
+            vertical-align: top; 
+        }
+        .info-block h3 { 
+            font-size: 11px; 
+            color: #1A4D2E; 
+            margin-bottom: 3px; 
+            padding-bottom: 2px; 
+            border-bottom: 1px solid #50B848; 
+        }
+        .info-block p { 
+            font-size: 10px; 
+            line-height: 1.3; 
+            color: #2C3E50; 
+            margin: 0; 
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 15px 0; 
+            page-break-inside: avoid;
+        }
+        tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+        th { 
+            padding: 5px; 
+            font-size: 9px; 
+            background-color: #1A4D2E; 
+            color: white; 
+            border-bottom: 1px solid #1A4D2E; 
+            text-align: left; 
+            text-transform: uppercase; 
+        }
+        td { 
+            padding: 5px; 
+            font-size: 9px; 
+            border-bottom: 1px solid #ddd; 
+            color: #333; 
+        }
+        .text-right { 
+            text-align: right; 
+        }
+        .gst-breakdown { 
+            padding: 5px; 
+            margin: 15px 0 0 0; 
+            background-color: #F8F9FA; 
+            border: 1px solid #E0E0E0; 
+            page-break-inside: avoid;
+        }
+        .gst-breakdown h4 { 
+            font-size: 11px; 
+            margin-bottom: 5px; 
+            color: #1A4D2E; 
+        }
+        .total-row td { 
+            padding: 8px; 
+            font-size: 11px; 
+            background: #1A4D2E; 
+            color: white; 
+            font-weight: bold; 
+        }
+        .status-badge { 
+            display: inline-block; 
+            padding: 3px 10px; 
+            border-radius: 10px; 
+            font-size: 9px;
+            font-weight: bold; 
+        }
+        .status-paid { background: #D4EDDA; color: #155724; }
+        .status-pending { background: #FFF3CD; color: #856404; }
+        .status-confirmed { background: #D1ECF1; color: #0C5460; }
+
+        .payment-terms-box { 
+            margin-top: 15px; 
+            padding: 10px; 
+            background-color: #F8F9FA; 
+            border: 1px solid #ddd; 
+            border-left: 4px solid #50B848; 
+            page-break-inside: avoid; 
+        }
+        .payment-terms-box h4 {
+            color: #1A4D2E;
+            margin-bottom: 3px;
+            font-size: 11px;
+        }
+        .payment-terms-box p {
+            font-size: 9px;
+            line-height: 1.2;
+        }
+        .invoice-footer { 
+            margin-top: 20px; 
+            padding-top: 10px; 
+            border-top: 1px solid #E0E0E0; 
+            text-align: center; 
+            page-break-inside: avoid;
+        }
+        .invoice-footer p { 
+            font-size: 9px; 
+            margin: 2px 0; 
+            color: #808080; 
+        }
+        .invoice-actions, .modal { display: none; }
+';
+
+$invoice_html = '
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>Bill #' . $b['id'] . '</title>
+    <style>
+        ' . ($pdf ? $pdf_css : $web_css) . '
     </style>
 </head>
-<body>
+<body class="' . ($pdf ? 'pdf-view' : '') . '">
     <div class="invoice-container">
         <div class="invoice-header">
             <h1>BILL</h1>
             <p>Bill #' . $b['id'] . ' | Date: ' . date('F d, Y', strtotime($b['created_at'])) . '</p>
         </div>
         
-        <div class="invoice-info">
-            <div class="info-block">
-                <h3>Hotel Information</h3>
-                <p>
-                    <strong>Bed N Basics</strong><br>
-                    Satav Chowk, Jatharpeth, Akola.<br>
-                    Phone: +91 12345 67890<br>
-                    Email: reservations@hotel.com<br>
-                    <strong>GSTIN:</strong> 27CNLPD2064H1Z2
-                </p>
-            </div>
-            <div class="info-block">
-                <h3>Bill To</h3>
-                <p>
-                    <strong>' . htmlspecialchars($b['customer_name'], ENT_QUOTES, 'UTF-8') . '</strong><br>
-                    ' . htmlspecialchars($b['customer_email'], ENT_QUOTES, 'UTF-8') . '<br>
-                    ' . htmlspecialchars($b['customer_phone'], ENT_QUOTES, 'UTF-8') . '
-                </p>
-            </div>
-        </div>
+        <table class="invoice-info-table" style="width: 100%; border-spacing: 0; margin-bottom: 20px;">
+            <tr>
+                <td style="width: 50%; vertical-align: top; padding-right: 20px;">
+                    <div class="info-block">
+                        <h3>Hotel Information</h3>
+                        <p>
+                            <strong>Bed N Basics</strong><br>
+                            Satav Chowk, Jatharpeth, Akola.<br>
+                            Phone: +91 12345 67890<br>
+                            Email: reservations@hotel.com<br>
+                            <strong>GSTIN:</strong> 27CNLPD2064H1Z2
+                        </p>
+                    </div>
+                </td>
+                <td style="width: 50%; vertical-align: top; padding-left: 20px;">
+                    <div class="info-block">
+                        <h3>Bill To</h3>
+                        <p>
+                            <strong>' . htmlspecialchars($b['customer_name'], ENT_QUOTES, 'UTF-8') . '</strong><br>
+                            ' . htmlspecialchars($b['customer_email'], ENT_QUOTES, 'UTF-8') . '<br>
+                            ' . htmlspecialchars($b['customer_phone'], ENT_QUOTES, 'UTF-8') . '
+                        </p>
+                    </div>
+                </td>
+            </tr>
+        </table>
         
         <table>
             <thead>
@@ -473,27 +698,29 @@ $invoice_html = '
         
         <div class="gst-breakdown">
             <h4>GST Breakdown</h4>
-            <div class="gst-row">
-                <span>Room Charges:</span>
-                <span><strong>Rs. ' . number_format($roomAmount, 2) . '</strong></span>
-            </div>
-            <div class="gst-row">
-                <span>GST Rate:</span>
-                <span><strong>' . number_format($b['gst_rate'], 2) . '%</strong></span>
-            </div>
-            <div class="gst-row">
-                <span>GST Amount:</span>
-                <span><strong>Rs. ' . number_format($b['gst_amount'], 2) . '</strong></span>
-            </div>
-            ' . ($extrasTotal > 0 ? '
-            <div class="gst-row">
-                <span>Additional Charges (Food, Services, etc):</span>
-                <span><strong>Rs. ' . number_format($extrasTotal, 2) . '</strong></span>
-            </div>' : '') . '
-            <div class="gst-row" style="border-top: 2px solid #1A4D2E; margin-top: 10px; padding-top: 15px;">
-                <span style="font-size: 18px; font-weight: bold; color: #1A4D2E;">Total Amount (Including GST):</span>
-                <span style="font-size: 20px; font-weight: bold; color: #1A4D2E;">Rs. ' . number_format($b['total'], 2) . '</span>
-            </div>
+            <table style="width: 100%; border-spacing: 0;">
+                <tr>
+                    <td style="padding: 4px 0;">Room Charges:</td>
+                    <td class="text-right" style="padding: 4px 0;"><strong>Rs. ' . number_format($roomAmount, 2) . '</strong></td>
+                </tr>
+                <tr>
+                    <td style="padding: 4px 0;">GST Rate:</td>
+                    <td class="text-right" style="padding: 4px 0;"><strong>' . number_format($b['gst_rate'], 2) . '%</strong></td>
+                </tr>
+                <tr>
+                    <td style="padding: 4px 0;">GST Amount:</td>
+                    <td class="text-right" style="padding: 4px 0;"><strong>Rs. ' . number_format($b['gst_amount'], 2) . '</strong></td>
+                </tr>
+                ' . ($extrasTotal > 0 ? '
+                <tr>
+                    <td style="padding: 4px 0;">Additional Charges (Food, Services, etc):</td>
+                    <td class="text-right" style="padding: 4px 0;"><strong>Rs. ' . number_format($extrasTotal, 2) . '</strong></td>
+                </tr>' : '') . '
+                <tr>
+                    <td style="padding: 10px 0 0 0; border-top: 2px solid #1A4D2E;"><span style="font-size: 14px; font-weight: bold; color: #1A4D2E;">Total Amount (Including GST):</span></td>
+                    <td class="text-right" style="padding: 10px 0 0 0; border-top: 2px solid #1A4D2E;"><span style="font-size: 16px; font-weight: bold; color: #1A4D2E;">Rs. ' . number_format($b['total'], 2) . '</span></td>
+                </tr>
+            </table>
         </div>
         
         <table>
@@ -617,22 +844,36 @@ window.onclick = function(event) {
 </html>';
 
 if ($pdf) {
-    require_once __DIR__ . '/../vendor/autoload.php';
+    try {
+        // Increase memory limit for PDF generation
+        ini_set('memory_limit', '512M');
+        ini_set('max_execution_time', 120);
 
-    // Configure Dompdf options
-    $options = new \Dompdf\Options();
-    $options->set('isHtml5ParserEnabled', true);
-    $options->set('isRemoteEnabled', false);
-    $options->set('defaultFont', 'DejaVu Sans');
+        require_once __DIR__ . '/../vendor/autoload.php';
 
-    $dompdf = new \Dompdf\Dompdf($options);
-    $dompdf->loadHtml($invoice_html, 'UTF-8');
-    $dompdf->setPaper('A4', 'portrait');
-    $dompdf->render();
+        // Configure Dompdf options
+        $options = new \Dompdf\Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', false);
+        $options->set('defaultFont', 'DejaVu Sans');
 
-    // Output PDF
-    $dompdf->stream("invoice-{$b['id']}.pdf", array("Attachment" => true));
-    exit;
+        $dompdf = new \Dompdf\Dompdf($options);
+        $dompdf->loadHtml($invoice_html, 'UTF-8');
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        // Output PDF
+        $dompdf->stream("invoice-{$b['id']}.pdf", array("Attachment" => true));
+        exit;
+    } catch (\Throwable $e) {
+        // Log error
+        $logFile = __DIR__ . '/pdf_error.log';
+        file_put_contents($logFile, date('Y-m-d H:i:s') . " Error: " . $e->getMessage() . "\n" . $e->getTraceAsString() . "\n", FILE_APPEND);
+
+        // Show generic error to user
+        http_response_code(500);
+        die("PDF Generation Failed. Error logged to pdf_error.log");
+    }
 }
 
 echo $invoice_html;
