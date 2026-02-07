@@ -118,14 +118,18 @@ foreach ($rooms as &$room) {
 SELECT COUNT(*) AS count
 FROM bookings b
 WHERE b.room_id = {$room['id']}
-  AND b.status <> 'cancelled'
+  AND b.status IN ('confirmed', 'paid', 'pending')
   AND b.checkin IS NOT NULL
   AND b.checkin <> '0000-00-00'
-  AND '$today' >= b.checkin
   AND (
-        b.checkout IS NULL
-     OR b.checkout = '0000-00-00'
-     OR '$today' < b.checkout
+      -- Standard range: checkin <= today < checkout
+      ('$today' >= b.checkin AND '$today' < b.checkout AND b.checkout IS NOT NULL AND b.checkout <> '0000-00-00')
+      OR
+      -- Invalid checkout: Only count if checkin IS today
+      (
+        (b.checkout IS NULL OR b.checkout = '0000-00-00')
+        AND b.checkin = '$today'
+      )
   )
 ")->fetch_assoc()['count'];
 

@@ -13,19 +13,52 @@ $DB->query("UPDATE bookings SET status='archived' WHERE checkout < '$sevenDaysAg
 
 $statusFilter = $_GET['status'] ?? 'all';
 
+// Filter Logic
+$search = trim($_GET['search'] ?? '');
+$filterDate = $_GET['date'] ?? '';
+
+// Base conditions
 if ($statusFilter === 'all') {
-    // Show everything EXCEPT archived
-    $whereClause = "WHERE (b.status != 'archived' OR b.status IS NULL)";
+    $whereConditions = ["(b.status != 'archived' OR b.status IS NULL)"];
 } else {
-    // Show specific status (including 'archived' if selected)
-    $whereClause = "WHERE b.status='" . $DB->real_escape_string($statusFilter) . "'";
+    $whereConditions = ["b.status='" . $DB->real_escape_string($statusFilter) . "'"];
 }
 
+// Search condition
+if (!empty($search)) {
+    $searchEsc = $DB->real_escape_string($search);
+    $whereConditions[] = "(
+            b.id LIKE '%$searchEsc%' OR 
+            b.customer_name LIKE '%$searchEsc%' OR 
+            b.customer_phone LIKE '%$searchEsc%' OR 
+            b.customer_email LIKE '%$searchEsc%'
+        )";
+}
+
+// Single Date condition (Check-in)
+if (!empty($filterDate)) {
+    $whereConditions[] = "DATE(b.checkin) = '" . $DB->real_escape_string($filterDate) . "'";
+}
+
+$whereClause = "WHERE " . implode(' AND ', $whereConditions);
+
+// Pagination Logic
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int) $_GET['page'] : 1;
+$limit = 10;
+$offset = ($page - 1) * $limit;
+
+// Get total count
+$total_result = $DB->query("SELECT COUNT(*) as count FROM bookings b $whereClause")->fetch_assoc();
+$total_bookings = $total_result['count'];
+$total_pages = ceil($total_bookings / $limit);
+
+// Fetch bookings with limit
 $bookings = $DB->query("SELECT b.*, r.title as room_title, r.code as room_code 
-                        FROM bookings b 
-                        LEFT JOIN rooms r ON r.id=b.room_id 
-                        $whereClause
-                        ORDER BY b.created_at DESC")->fetch_all(MYSQLI_ASSOC);
+                            FROM bookings b 
+                            LEFT JOIN rooms r ON r.id=b.room_id 
+                            $whereClause
+                            ORDER BY b.created_at DESC
+                            LIMIT $limit OFFSET $offset")->fetch_all(MYSQLI_ASSOC);
 
 // Helper function to format dates safely
 function formatDate($date, $placeholder = 'N/A')
@@ -85,46 +118,105 @@ function displayCheckout($checkin, $checkout, $nights)
         <div class="admin-content">
             <div class="page-header">
                 <h1><i class="fas fa-calendar-check"></i> Bookings Management</h1>
-                <div class="header-actions">
-                    <a href="create-booking.php" class="btn-primary">
+                <div class="header-actions" style="display:flex; gap:15px; align-items:center; flex-wrap:wrap;">
+                    <a href="create-booking.php" class="btn-primary"
+                        style="height: 42px; display: inline-flex; align-items: center;">
                         <i class="fas fa-plus"></i> Create Booking
                     </a>
 
-                    <div class="status-filters" style="display:flex; gap:5px; align-items:center;">
-                        <?php
-                        $statuses = [
-                            'all' => ['label' => 'All', 'icon' => 'fa-list', 'color' => '#6c757d'],
-                            'pending' => ['label' => 'Pending', 'icon' => 'fa-clock', 'color' => '#f39c12'],
-                            'confirmed' => ['label' => 'Confirmed', 'icon' => 'fa-check-double', 'color' => '#3498db'],
-                            'paid' => ['label' => 'Paid', 'icon' => 'fa-check', 'color' => '#27ae60'],
-                            'archived' => ['label' => 'Archived', 'icon' => 'fa-archive', 'color' => '#666'],
-                            'cancelled' => ['label' => 'Cancelled', 'icon' => 'fa-times', 'color' => '#e74c3c']
-                        ];
+                    <!-- Search and Date Filter Form -->
+                    <form method="GET" class="filter-form" style="display:flex; gap:10px; align-items:center;">
+                        <input type="hidden" name="status" value="<?= esc($statusFilter) ?>">
 
-                        foreach ($statuses as $key => $s):
-                            $isActive = ($statusFilter === $key);
-                            $bg = $isActive ? $s['color'] : '#f8f9fa';
-                            $fg = $isActive ? 'white' : '#333';
-                            $border = $isActive ? $s['color'] : '#ddd';
-                            ?>
-                            <a href="?status=<?= $key ?>" class="btn-filter" style="
-                            padding: 8px 12px; 
-                            border-radius: 4px; 
-                            text-decoration: none; 
-                            background: <?= $bg ?>; 
-                            color: <?= $fg ?>; 
-                            border: 1px solid <?= $border ?>;
-                            font-size: 0.9rem;
-                            display: inline-flex;
-                            align-items: center;
-                            gap: 5px;
-                            transition: all 0.2s;
-                        ">
-                                <i class="fas <?= $s['icon'] ?>"></i> <?= $s['label'] ?>
+                        <div class="input-group">
+                            <input type="text" name="search" placeholder="Search ID, Name..."
+                                value="<?= esc($_GET['search'] ?? '') ?>" style="
+                                height: 42px;
+                                padding: 0 15px;
+                                border: 1px solid #ddd;
+                                border-radius: 6px;
+                                font-size: 14px;
+                                min-width: 200px;
+                                outline: none;
+                            ">
+                        </div>
+
+                        <div class="input-group">
+                            <input type="date" name="date" value="<?= esc($_GET['date'] ?? '') ?>" style="
+                                height: 42px;
+                                padding: 0 15px;
+                                border: 1px solid #ddd;
+                                border-radius: 6px;
+                                font-size: 14px;
+                                outline: none;
+                                color: #555;
+                            ">
+                        </div>
+
+                        <button type="submit" class="btn-secondary"
+                            style="height: 42px; width: 42px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;">
+                            <i class="fas fa-search"></i>
+                        </button>
+
+                        <?php if (!empty($_GET['search']) || !empty($_GET['date'])): ?>
+                            <a href="bookings.php?status=<?= esc($statusFilter) ?>" class="btn-secondary" style="
+                                height: 42px; 
+                                width: 42px; 
+                                padding: 0; 
+                                display: inline-flex; 
+                                align-items: center; 
+                                justify-content: center; 
+                                border-radius: 6px;
+                                background: #ffeded; 
+                                color: #e74c3c; 
+                                border: 1px solid #ffcccc;
+                            " title="Clear Filters">
+                                <i class="fas fa-times"></i>
                             </a>
-                        <?php endforeach; ?>
-                    </div>
+                        <?php endif; ?>
+                    </form>
                 </div>
+            </div>
+
+            <!-- Status Tabs -->
+            <div class="status-filters"
+                style="display:flex; gap:5px; align-items:center; margin-bottom:20px; overflow-x:auto; padding-bottom:5px;">
+                <?php
+                $statuses = [
+                    'all' => ['label' => 'All', 'icon' => 'fa-list', 'color' => '#6c757d'],
+                    'pending' => ['label' => 'Pending', 'icon' => 'fa-clock', 'color' => '#f39c12'],
+                    'confirmed' => ['label' => 'Confirmed', 'icon' => 'fa-check-double', 'color' => '#3498db'],
+                    'paid' => ['label' => 'Paid', 'icon' => 'fa-check', 'color' => '#27ae60'],
+                    'archived' => ['label' => 'Archived', 'icon' => 'fa-archive', 'color' => '#666'],
+                    'cancelled' => ['label' => 'Cancelled', 'icon' => 'fa-times', 'color' => '#e74c3c']
+                ];
+
+                foreach ($statuses as $key => $s):
+                    $isActive = ($statusFilter === $key);
+                    $bg = $isActive ? $s['color'] : '#fff';
+                    $fg = $isActive ? 'white' : '#555';
+                    $border = $isActive ? $s['color'] : '#ddd';
+                    ?>
+                    <a href="?status=<?= $key ?>&search=<?= esc($_GET['search'] ?? '') ?>&date=<?= esc($_GET['date'] ?? '') ?>"
+                        class="btn-filter" style="
+                    padding: 8px 15px; 
+                    border-radius: 20px; 
+                    text-decoration: none; 
+                    background: <?= $bg ?>; 
+                    color: <?= $fg ?>; 
+                    border: 1px solid <?= $border ?>;
+                    font-size: 0.9rem;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    transition: all 0.2s;
+                    font-weight: 500;
+                    white-space: nowrap;
+                    box-shadow: <?= $isActive ? '0 2px 5px rgba(0,0,0,0.1)' : 'none' ?>;
+                ">
+                        <i class="fas <?= $s['icon'] ?>"></i> <?= $s['label'] ?>
+                    </a>
+                <?php endforeach; ?>
             </div>
 
             <div class="table-responsive">
@@ -247,6 +339,37 @@ function displayCheckout($checkin, $checkout, $nights)
                     </tbody>
                 </table>
             </div>
+
+            <!-- Pagination -->
+            <?php if ($total_pages > 1): ?>
+                <div class="pagination" style="display:flex; justify-content:center; gap:10px; margin-top:20px;">
+                    <?php
+                    // Rebuild query string without 'page'
+                    $params = $_GET;
+                    unset($params['page']);
+                    $queryString = http_build_query($params);
+                    ?>
+
+                    <?php if ($page > 1): ?>
+                        <a href="?<?= $queryString ?>&page=<?= $page - 1 ?>" class="btn-secondary" style="padding:8px 12px;">
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </a>
+                    <?php endif; ?>
+
+                    <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                        <a href="?<?= $queryString ?>&page=<?= $i ?>" class="btn-secondary"
+                            style="padding:8px 12px; <?= $i === $page ? 'background:var(--primary-dark); color:white; border-color:var(--primary-dark);' : '' ?>">
+                            <?= $i ?>
+                        </a>
+                    <?php endfor; ?>
+
+                    <?php if ($page < $total_pages): ?>
+                        <a href="?<?= $queryString ?>&page=<?= $page + 1 ?>" class="btn-secondary" style="padding:8px 12px;">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </a>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 

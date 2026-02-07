@@ -59,7 +59,7 @@ foreach ($rooms as &$room) {
                                                FROM bookings b 
                                                LEFT JOIN rooms r ON r.id = b.room_id 
                                                WHERE b.room_id = {$room['id']} 
-                                               AND b.status IN ('confirmed', 'paid')
+                                               AND b.status IN ('confirmed', 'paid', 'pending')
                                                AND b.checkin IS NOT NULL 
                                                AND b.checkin <> '0000-00-00'
                                                AND (
@@ -83,9 +83,10 @@ foreach ($rooms as &$room) {
                                             FROM bookings b 
                                             LEFT JOIN rooms r ON r.id = b.room_id 
                                             WHERE b.room_id = {$room['id']} 
-                                            AND b.status IN ('confirmed', 'paid')
+                                            AND b.status IN ('confirmed', 'paid', 'pending')
                                             AND b.checkin IS NOT NULL 
                                             AND b.checkin <> '0000-00-00'
+                                            AND DATE(b.checkin) >= DATE('$today')
                                             ORDER BY b.checkin ASC 
                                             LIMIT 1")->fetch_assoc();
     }
@@ -96,7 +97,7 @@ foreach ($rooms as &$room) {
                                             FROM bookings b 
                                             LEFT JOIN rooms r ON r.id = b.room_id 
                                             WHERE b.room_id = {$room['id']} 
-                                            AND b.status IN ('confirmed', 'paid')
+                                            AND b.status IN ('confirmed', 'paid', 'pending')
                                             AND b.checkin IS NOT NULL 
                                             AND b.checkin <> '0000-00-00'
                                             AND DATE(b.checkin) > DATE('$today')
