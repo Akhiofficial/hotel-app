@@ -31,9 +31,9 @@ $rooms = $DB->query("SELECT r.*,
                            AND DATE(b.checkin) <= DATE('$today')
                            AND DATE(b.checkout) > DATE('$today'))
                           OR
-                          -- Invalid checkout but checkin is today or past
+                          -- Invalid checkout but checkin IS today
                           ((b.checkout IS NULL OR b.checkout = '0000-00-00')
-                           AND DATE(b.checkin) <= DATE('$today'))
+                           AND DATE(b.checkin) = DATE('$today'))
                       )) as currently_occupied_count
                      FROM rooms r 
                      WHERE r.status='active' 
@@ -69,9 +69,9 @@ foreach ($rooms as &$room) {
                                                     AND DATE(b.checkin) <= DATE('$today')
                                                     AND DATE(b.checkout) > DATE('$today'))
                                                    OR
-                                                   -- Invalid checkout but checkin is today or past
+                                                   -- Invalid checkout but checkin IS today
                                                    ((b.checkout IS NULL OR b.checkout = '0000-00-00')
-                                                    AND DATE(b.checkin) <= DATE('$today'))
+                                                    AND DATE(b.checkin) = DATE('$today'))
                                                )
                                                ORDER BY b.checkin DESC 
                                                LIMIT 1")->fetch_assoc();
@@ -109,7 +109,8 @@ foreach ($rooms as &$room) {
                                           DATE(checkin) as checkin_date, 
                                           DATE(checkout) as checkout_date,
                                           CASE 
-                                            WHEN (checkout IS NULL OR checkout = '0000-00-00') AND DATE(checkin) <= DATE('$today') THEN 'ACTIVE (no checkout)'
+                                            WHEN (checkout IS NULL OR checkout = '0000-00-00') AND DATE(checkin) = DATE('$today') THEN 'ACTIVE (no checkout, today)'
+                                            WHEN (checkout IS NULL OR checkout = '0000-00-00') AND DATE(checkin) < DATE('$today') THEN 'PAST (no checkout, expired)'
                                             WHEN checkout IS NOT NULL AND checkout <> '0000-00-00' AND DATE(checkin) <= DATE('$today') AND DATE(checkout) > DATE('$today') THEN 'ACTIVE'
                                             WHEN DATE(checkin) > DATE('$today') THEN 'FUTURE'
                                             WHEN checkout IS NOT NULL AND checkout <> '0000-00-00' AND DATE(checkout) <= DATE('$today') THEN 'PAST'
